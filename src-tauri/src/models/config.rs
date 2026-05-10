@@ -191,4 +191,40 @@ mod tests {
         // version field
         assert!(json.contains("\"version\""));
     }
+
+    #[test]
+    fn test_update_tool_paths_merges() {
+        let _tmp = setup();
+        // update only ClaudeCode global path
+        let mut updates = std::collections::HashMap::new();
+        updates.insert(
+            "ClaudeCode".to_string(),
+            serde_json::json!({
+                "global": "~/custom/claude/skills/",
+                "project": ".claude/skills/"
+            }),
+        );
+        crate::commands::config::update_tool_paths(updates).unwrap();
+
+        let config = load_config().unwrap();
+        let claude = config.tool_paths.get("ClaudeCode").unwrap();
+        assert_eq!(claude.global, "~/custom/claude/skills/");
+        // Other tools should still exist
+        assert!(config.tool_paths.contains_key("CopilotCLI"));
+        assert!(config.tool_paths.contains_key("GeminiCLI"));
+    }
+
+    #[test]
+    fn test_update_tool_paths_rejects_missing_field() {
+        let _tmp = setup();
+        let mut updates = std::collections::HashMap::new();
+        // Missing "project" field
+        updates.insert(
+            "ClaudeCode".to_string(),
+            serde_json::json!({ "global": "~/x/" }),
+        );
+        let result = crate::commands::config::update_tool_paths(updates);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("project"));
+    }
 }

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Skill, Distribution, Project, GitInfo, AppConfig, Tool, DistStatus } from "../types";
+import type { Skill, Distribution, Project, GitInfo, AppConfig, Tool, DistStatus, ToolPaths } from "../types";
 
 export type { Tool, DistStatus };
 
@@ -21,6 +21,10 @@ export async function getSkillDetail(id: string): Promise<Skill> {
 
 export async function pullGithubSkill(id: string): Promise<{ new_skills: string[]; removed_skills: string[] }> {
   return invoke("pull_github_skill", { id });
+}
+
+export async function deleteSkill(id: string): Promise<void> {
+  return invoke("delete_skill", { id });
 }
 
 export async function distributeSkill(
@@ -52,12 +56,24 @@ export async function addSkillToProject(projectId: string, skillId: string): Pro
   return invoke("add_skill_to_project", { projectId, skillId });
 }
 
+export async function removeSkillFromProject(projectId: string, skillId: string): Promise<void> {
+  return invoke("remove_skill_from_project", { projectId, skillId });
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  return invoke("delete_project", { id });
+}
+
 export async function getGitInfo(path: string): Promise<GitInfo> {
   return invoke("get_git_info", { path });
 }
 
 export async function getAppConfig(): Promise<AppConfig> {
   return invoke("get_app_config");
+}
+
+export async function updateToolPaths(toolPaths: Record<string, ToolPaths>): Promise<void> {
+  return invoke("update_tool_paths", { toolPaths });
 }
 
 export interface FileNode {

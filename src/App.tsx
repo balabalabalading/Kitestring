@@ -6,7 +6,7 @@ import type { Skill } from "./types";
 function App() {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
 
-  const handleSelectSkill = useCallback((skill: Skill) => {
+  const handleSelectSkill = useCallback((skill: Skill | null) => {
     setSelectedSkill(skill);
   }, []);
 

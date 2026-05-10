@@ -62,6 +62,12 @@ pub fn pull_github_skill(id: String) -> Result<PullResultDto, String> {
     })
 }
 
+/// Delete a skill and all its associated distributions
+#[tauri::command]
+pub fn delete_skill(id: String) -> Result<(), String> {
+    importer::delete_skill(&id)
+}
+
 /// List all files in a skill's source directory as a tree
 #[tauri::command]
 pub fn list_skill_files(skill_id: String) -> Result<Vec<FileNode>, String> {

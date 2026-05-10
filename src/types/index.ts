@@ -38,12 +38,17 @@ export interface GitInfo {
   is_git_repo: boolean;
 }
 
+export interface ToolPaths {
+  global: string;
+  project: string;
+}
+
 export interface AppConfig {
   version: string;
   skills: Skill[];
   distributions: Distribution[];
   projects: Project[];
-  toolPaths: Record<string, { global: string; project: string }>;
+  tool_paths: Record<string, ToolPaths>;
 }
 
 export const TOOL_DISPLAY_NAMES: Record<Tool, string> = {

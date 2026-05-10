@@ -27,6 +27,7 @@ pub fn run() {
             commands::skill::list_skills,
             commands::skill::get_skill_detail,
             commands::skill::pull_github_skill,
+            commands::skill::delete_skill,
             commands::skill::list_skill_files,
             commands::skill::read_skill_file,
             commands::distribution::distribute_skill,
@@ -35,8 +36,11 @@ pub fn run() {
             commands::project::create_project,
             commands::project::list_projects,
             commands::project::add_skill_to_project,
+            commands::project::remove_skill_from_project,
+            commands::project::delete_project,
             commands::version::get_git_info,
             commands::config::get_app_config,
+            commands::config::update_tool_paths,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
