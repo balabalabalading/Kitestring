@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::models::config::{load_config, save_config};
+use crate::models::config::{load_config, save_config, AppConfig};
 use crate::models::distribution::{DistStatus, Distribution, EntryType, Scope, Tool};
 use crate::models::skill::{Skill, SourceType};
 use crate::services::skill_parser::{find_skill_md_files, parse_skill_md};
@@ -472,149 +472,125 @@ fn find_git_repo_root(path: &Path) -> Option<std::path::PathBuf> {
 /// Resolves symlinks to real targets so users who already have skills
 /// linked from other tools get them imported automatically.
 /// For each symlink found, a Distribution record (Linked) is created.
+/// Shared context for the skill-discovery pass.
+struct DiscoveryContext<'a> {
+    config: &'a mut AppConfig,
+    imported: Vec<Skill>,
+    config_changed: bool,
+    now: String,
+    ignored_abs: Vec<std::path::PathBuf>,
+}
+
+impl<'a> DiscoveryContext<'a> {
+    fn new(config: &'a mut AppConfig) -> Self {
+        let home = dirs::home_dir().unwrap_or_default();
+        let ignored_abs = config.ignored_paths.iter()
+            .map(|p| home.join(p.trim_start_matches("~/")))
+            .collect();
+        let now = chrono::Utc::now().to_rfc3339();
+        DiscoveryContext { config, imported: Vec::new(), config_changed: false, now, ignored_abs }
+    }
+
+    fn is_ignored(&self, path: &std::path::Path) -> bool {
+        self.ignored_abs.iter().any(|ig| path.starts_with(ig))
+    }
+
+    /// Scan a primary global dir (one level, symlink-aware).
+    fn scan_global_path(&mut self, dir: &std::path::Path, tool: &Tool) {
+        if self.is_ignored(dir) || !dir.exists() { return; }
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            let is_symlink = entry_path.symlink_metadata()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+            let real_path = if is_symlink || entry_path.is_dir() {
+                match fs::canonicalize(&entry_path) {
+                    Ok(p) => p,
+                    Err(_) => { if is_symlink { continue; } else { entry_path.clone() } },
+                }
+            } else {
+                continue;
+            };
+            if !real_path.is_dir() { continue; }
+            let real_path_str = real_path.to_string_lossy().to_string();
+            let skill_id = find_or_import_skill(
+                &real_path, &real_path_str, &self.now.clone(),
+                self.config, &mut self.imported, &mut self.config_changed,
+            );
+            let skill_id = match skill_id { Some(id) => id, None => continue };
+            let entry_path_str = entry_path.to_string_lossy().to_string();
+            let entry_type = if is_symlink { EntryType::Symlink } else { EntryType::Folder };
+            add_distribution_if_missing(
+                skill_id, tool.clone(), entry_path_str, entry_type,
+                self.config, &mut self.config_changed,
+            );
+        }
+    }
+
+    /// Recursively scan an extra_globals dir (up to depth 5).
+    fn scan_extra_global(&mut self, eg_dir: &std::path::Path, tool: &Tool) {
+        if !eg_dir.exists() || self.is_ignored(eg_dir) { return; }
+        let skill_dirs = find_skill_dirs_recursive(eg_dir, 5);
+        for skill_dir in skill_dirs {
+            if self.is_ignored(&skill_dir) { continue; }
+            let is_symlink = skill_dir.symlink_metadata()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+            let real_path = match fs::canonicalize(&skill_dir) {
+                Ok(p) => p,
+                Err(_) => { if is_symlink { continue; } else { skill_dir.clone() } },
+            };
+            if !real_path.is_dir() { continue; }
+            let real_path_str = real_path.to_string_lossy().to_string();
+            let skill_id = find_or_import_skill(
+                &real_path, &real_path_str, &self.now.clone(),
+                self.config, &mut self.imported, &mut self.config_changed,
+            );
+            let skill_id = match skill_id { Some(id) => id, None => continue };
+            let entry_path_str = skill_dir.to_string_lossy().to_string();
+            let entry_type = if is_symlink { EntryType::Symlink } else { EntryType::Folder };
+            add_distribution_if_missing(
+                skill_id, tool.clone(), entry_path_str, entry_type,
+                self.config, &mut self.config_changed,
+            );
+        }
+    }
+}
+
 pub fn discover_skills_from_tool_paths() -> Result<Vec<Skill>, String> {
     let mut config = load_config()?;
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
-    let now = chrono::Utc::now().to_rfc3339();
-    let mut imported: Vec<Skill> = Vec::new();
-    let mut config_changed = false;
 
-    // Expand ignored_paths to absolute paths for easy comparison
-    let ignored_abs: Vec<std::path::PathBuf> = config.ignored_paths.iter().map(|p| {
-        let stripped = p.trim_start_matches("~/");
-        home.join(stripped)
-    }).collect();
-
-    let is_ignored = |path: &std::path::Path| -> bool {
-        ignored_abs.iter().any(|ig| path.starts_with(ig))
-    };
-
-    // Collect (tool_name, global_path, extra_globals) triples
-    let tool_scan_paths: Vec<(String, String, Vec<String>)> = config.tool_paths.iter()
-        .map(|(k, v)| (k.clone(), v.global.clone(), v.extra_globals.clone()))
+    // Collect (tool, global_dir, extra_global_dirs) before borrowing config mutably
+    let tool_scan_paths: Vec<(Tool, std::path::PathBuf, Vec<std::path::PathBuf>)> = config.tool_paths.iter()
+        .filter_map(|(k, v)| {
+            let tool: Tool = k.parse().ok()?;
+            let global_dir = home.join(v.global.trim_start_matches("~/"));
+            let extra_dirs = v.extra_globals.iter()
+                .map(|eg| home.join(eg.trim_start_matches("~/")))
+                .collect();
+            Some((tool, global_dir, extra_dirs))
+        })
         .collect();
 
-    for (tool_name, global_path, extra_globals) in &tool_scan_paths {
-        // --- Scan the primary global path (one-level, symlink-aware) ---
-        let path_str = global_path.trim_start_matches("~/");
-        let dir = home.join(path_str);
+    let mut ctx = DiscoveryContext::new(&mut config);
 
-        if is_ignored(&dir) { continue; }
-
-        if dir.exists() {
-            let entries = match fs::read_dir(&dir) {
-                Ok(e) => e,
-                Err(_) => {
-                    // Skip this dir if unreadable
-                    continue;
-                }
-            };
-
-            for entry in entries.flatten() {
-                let entry_path = entry.path();
-                let is_symlink = entry_path.symlink_metadata()
-                    .map(|m| m.file_type().is_symlink())
-                    .unwrap_or(false);
-
-                let real_path = if is_symlink {
-                    match fs::canonicalize(&entry_path) {
-                        Ok(p) => p,
-                        Err(_) => continue,
-                    }
-                } else if entry_path.is_dir() {
-                    match fs::canonicalize(&entry_path) {
-                        Ok(p) => p,
-                        Err(_) => entry_path.clone(),
-                    }
-                } else {
-                    continue;
-                };
-
-                if !real_path.is_dir() {
-                    continue;
-                }
-
-                let real_path_str = real_path.to_string_lossy().to_string();
-
-                let skill_id = find_or_import_skill(
-                    &real_path, &real_path_str, &now,
-                    &mut config, &mut imported, &mut config_changed,
-                );
-                let skill_id = match skill_id { Some(id) => id, None => continue };
-
-                let tool: Tool = match tool_name.parse() {
-                    Ok(t) => t,
-                    Err(_) => continue,
-                };
-                let entry_path_str = entry_path.to_string_lossy().to_string();
-                let entry_type = if is_symlink { EntryType::Symlink } else { EntryType::Folder };
-                add_distribution_if_missing(
-                    skill_id, tool, entry_path_str, entry_type,
-                    &mut config, &mut config_changed,
-                );
-            }
-        }
-
-        // --- Recursively scan extra_globals (e.g. ~/.claude/plugins/) ---
-        for eg in extra_globals {
-            let eg_str = eg.trim_start_matches("~/");
-            let eg_dir = home.join(eg_str);
-            if !eg_dir.exists() || is_ignored(&eg_dir) {
-                continue;
-            }
-
-            // Collect all directories containing SKILL.md up to depth 5
-            let skill_dirs = find_skill_dirs_recursive(&eg_dir, 5);
-
-            for skill_dir in skill_dirs {
-                if is_ignored(&skill_dir) { continue; }
-                let is_symlink = skill_dir.symlink_metadata()
-                    .map(|m| m.file_type().is_symlink())
-                    .unwrap_or(false);
-
-                let real_path = if is_symlink {
-                    match fs::canonicalize(&skill_dir) {
-                        Ok(p) => p,
-                        Err(_) => continue,
-                    }
-                } else {
-                    match fs::canonicalize(&skill_dir) {
-                        Ok(p) => p,
-                        Err(_) => skill_dir.clone(),
-                    }
-                };
-
-                if !real_path.is_dir() {
-                    continue;
-                }
-
-                let real_path_str = real_path.to_string_lossy().to_string();
-
-                let skill_id = find_or_import_skill(
-                    &real_path, &real_path_str, &now,
-                    &mut config, &mut imported, &mut config_changed,
-                );
-                let skill_id = match skill_id { Some(id) => id, None => continue };
-
-                let tool: Tool = match tool_name.parse() {
-                    Ok(t) => t,
-                    Err(_) => continue,
-                };
-                let entry_path_str = skill_dir.to_string_lossy().to_string();
-                let entry_type = if is_symlink { EntryType::Symlink } else { EntryType::Folder };
-                add_distribution_if_missing(
-                    skill_id, tool, entry_path_str, entry_type,
-                    &mut config, &mut config_changed,
-                );
-            }
+    for (tool, global_dir, extra_dirs) in &tool_scan_paths {
+        ctx.scan_global_path(global_dir, tool);
+        for eg_dir in extra_dirs {
+            ctx.scan_extra_global(eg_dir, tool);
         }
     }
 
-    if config_changed {
-        save_config(&config)?;
+    if ctx.config_changed {
+        save_config(ctx.config)?;
     }
 
-    Ok(imported)
+    Ok(ctx.imported)
 }
 
 /// Find all directories that contain SKILL.md, up to `max_depth` levels deep.

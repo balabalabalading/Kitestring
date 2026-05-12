@@ -8,7 +8,6 @@ export interface Skill {
   has_git: boolean;
   created_at: string;
   updated_at: string;
-  project_id: string | null;
   group: string | null;
 }
 
@@ -50,12 +49,12 @@ export interface ToolPaths {
 }
 
 export interface AppConfig {
-  version: string;
   skills: Skill[];
   distributions: Distribution[];
   projects: Project[];
   tool_paths: Record<string, ToolPaths>;
   ignored_paths: string[];
+  groups: string[];
 }
 
 export const TOOL_DISPLAY_NAMES: Record<Tool, string> = {

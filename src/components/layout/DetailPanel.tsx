@@ -208,7 +208,7 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
     if (!skill) return;
     setDistError(null);
     try {
-      const dist = await tauri.distributeSkill(skill.id, tool, scope, skill.project_id ?? undefined);
+      const dist = await tauri.distributeSkill(skill.id, tool, scope);
       setDistributions((prev) => [...prev, dist]);
     } catch (e) {
       setDistError(String(e));
@@ -256,34 +256,34 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
             <p className="text-xs text-[#424245] mb-1">
               确认从 AgentNexus 中移除「{skill.name}」？
             </p>
-            <p className="text-xs text-[#86868b] mb-3">
+            <p className="text-xs text-[#86868b] mb-4">
               不会删除本地文件夹。
             </p>
-            <label className="flex items-center gap-2 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={keepSymlinks}
-                onChange={(e) => setKeepSymlinks(e.target.checked)}
-                className="w-3.5 h-3.5 accent-[#1d1d1f]"
-              />
-              <span className="text-xs text-[#424245]">保留 symlink，仅删除 Skill 记录</span>
-            </label>
             {actionError && (
               <div className="mb-3 text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded-md">{actionError}</div>
             )}
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col gap-2">
+              {distributions.filter((d) => d.entry_type === "Symlink").length > 0 && (
+                <button
+                  onClick={() => { setKeepSymlinks(false); handleDelete(); }}
+                  disabled={deleting}
+                  className="text-xs px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 text-left"
+                >
+                  {deleting ? "删除中..." : `删除并清理 symlink（${distributions.filter((d) => d.entry_type === "Symlink").length} 个）`}
+                </button>
+              )}
               <button
-                onClick={() => { setConfirmDelete(false); setActionError(null); }}
-                className="text-xs px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
+                onClick={() => { setKeepSymlinks(true); handleDelete(); }}
+                disabled={deleting}
+                className="text-xs px-4 py-2 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50 disabled:opacity-50 text-left"
               >
-                取消
+                {deleting ? "删除中..." : "仅删除记录（保留 symlink）"}
               </button>
               <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-xs px-4 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+                onClick={() => { setConfirmDelete(false); setActionError(null); }}
+                className="text-xs px-4 py-1.5 rounded-md text-[#86868b] hover:text-[#424245]"
               >
-                {deleting ? "删除中..." : "确认删除"}
+                取消
               </button>
             </div>
           </div>

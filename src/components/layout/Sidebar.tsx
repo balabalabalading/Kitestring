@@ -32,7 +32,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [groupName, setGroupName] = useState("未命名");
   // Create group
-  const [localGroups, setLocalGroups] = useState<string[]>([]);
+  const [serverGroups, setServerGroups] = useState<string[]>([]);
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   // Drag-over group
@@ -106,12 +106,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
 
   async function loadData() {
     try {
-      const [skillList, projectList] = await Promise.all([
+      const [skillList, projectList, groupList] = await Promise.all([
         tauri.listSkills(),
         tauri.listProjects(),
+        tauri.listGroups(),
       ]);
       setSkills(skillList);
       setProjects(projectList);
+      setServerGroups(groupList);
       const gitResults = await Promise.allSettled(
         skillList.map((s) => tauri.getGitInfo(s.source_path))
       );
@@ -163,12 +165,27 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
     await loadData();
   }
 
-  function handleCreateGroup() {
+  async function handleCreateGroup() {
     const name = newGroupName.trim();
     if (!name) return;
-    setLocalGroups((prev) => prev.includes(name) ? prev : [...prev, name]);
+    try {
+      await tauri.createGroup(name);
+      setServerGroups((prev) => prev.includes(name) ? prev : [...prev, name]);
+    } catch (e) {
+      console.error("Failed to create group:", e);
+    }
     setShowCreateGroupDialog(false);
     setNewGroupName("");
+  }
+
+  async function handleDeleteGroup(name: string) {
+    try {
+      await tauri.deleteGroup(name);
+      setServerGroups((prev) => prev.filter((g) => g !== name));
+      await loadData();
+    } catch (e) {
+      console.error("Failed to delete group:", e);
+    }
   }
 
   async function handleDropOnGroup(e: React.DragEvent, groupLabel: string) {
@@ -239,10 +256,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
       ungroupedSkills.push(skill);
     }
   }
-  // Merge localGroups (may be empty)
+  // Merge serverGroups (may contain empty groups)
   const allGroupLabels = Array.from(new Set([
     ...Array.from(groupedSkills.keys()),
-    ...localGroups,
+    ...serverGroups,
   ])).sort();
 
   const hasSkills = skills.length > 0;
@@ -448,6 +465,17 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
                         </svg>
                         <span className="truncate">{groupLabel}</span>
                         {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
+                        {!isOver && groupSkills.length === 0 && (
+                          <button
+                            onClick={() => handleDeleteGroup(groupLabel)}
+                            className="ml-auto text-[#86868b] hover:text-red-500 transition-colors"
+                            title="删除空分组"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                       {groupSkills.map((skill) => (
                         <SkillItem

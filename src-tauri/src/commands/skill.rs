@@ -85,7 +85,50 @@ pub fn delete_all_skills(keep_symlinks: bool) -> Result<(), String> {
 pub fn set_skill_group(id: String, group: Option<String>) -> Result<(), String> {
     let mut config = crate::models::config::load_config()?;
     let skill = config.skills.iter_mut().find(|s| s.id == id).ok_or("Skill not found")?;
-    skill.group = group;
+    skill.group = group.clone();
+    // Maintain invariant: every skill.group value must appear in config.groups
+    if let Some(ref name) = group {
+        let trimmed = name.trim().to_string();
+        if !trimmed.is_empty() && !config.groups.contains(&trimmed) {
+            config.groups.push(trimmed);
+        }
+    }
+    crate::models::config::save_config(&config)?;
+    Ok(())
+}
+
+/// Return all persisted group names
+#[tauri::command]
+pub fn list_groups() -> Result<Vec<String>, String> {
+    let config = crate::models::config::load_config()?;
+    Ok(config.groups.clone())
+}
+
+/// Create a named group (persists even when empty)
+#[tauri::command]
+pub fn create_group(name: String) -> Result<(), String> {
+    let trimmed = name.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("分组名不能为空".to_string());
+    }
+    let mut config = crate::models::config::load_config()?;
+    if !config.groups.contains(&trimmed) {
+        config.groups.push(trimmed);
+        crate::models::config::save_config(&config)?;
+    }
+    Ok(())
+}
+
+/// Delete a group: removes from config.groups and clears skill.group for all skills in this group
+#[tauri::command]
+pub fn delete_group(name: String) -> Result<(), String> {
+    let mut config = crate::models::config::load_config()?;
+    config.groups.retain(|g| g != &name);
+    for skill in &mut config.skills {
+        if skill.group.as_deref() == Some(&name) {
+            skill.group = None;
+        }
+    }
     crate::models::config::save_config(&config)?;
     Ok(())
 }
@@ -105,6 +148,7 @@ pub fn refresh_skill(id: String) -> Result<Skill, String> {
     let meta = crate::services::skill_parser::parse_skill_md(&skill_md)?;
     skill.name = meta.name;
     skill.description = meta.description;
+    skill.updated_at = chrono::Utc::now().to_rfc3339();
     let updated = skill.clone();
     crate::models::config::save_config(&config)?;
     Ok(updated)
@@ -235,11 +279,16 @@ mod tests {
         let updated = refresh_skill(id.clone()).unwrap();
         assert_eq!(updated.name, "updated-name");
         assert_eq!(updated.description, "updated desc");
+        // updated_at should have changed and be valid RFC3339
+        assert_ne!(updated.updated_at, "2024-01-01", "updated_at should be updated");
+        chrono::DateTime::parse_from_rfc3339(&updated.updated_at)
+            .expect("updated_at should be valid RFC3339");
 
         // Verify persisted to config
         let config = crate::models::config::load_config().unwrap();
         let persisted = config.skills.iter().find(|s| s.id == id).unwrap();
         assert_eq!(persisted.name, "updated-name");
+        assert_ne!(persisted.updated_at, "2024-01-01", "persisted updated_at should be updated");
     }
 
     #[test]
@@ -333,5 +382,61 @@ mod tests {
         let ids: Vec<&str> = result.iter().map(|s| s.id.as_str()).collect();
         assert!(ids.contains(&id_dist.as_str()), "skill with distribution in project should appear via rule 3");
         assert!(!ids.contains(&id_none.as_str()), "skill with no project distribution should not appear");
+    }
+
+    #[test]
+    fn test_create_group_persists() {
+        let _tmp = setup_test_env();
+        create_group("web-tools".to_string()).unwrap();
+        let groups = list_groups().unwrap();
+        assert!(groups.contains(&"web-tools".to_string()), "created group should be persisted");
+    }
+
+    #[test]
+    fn test_create_group_dedup() {
+        let _tmp = setup_test_env();
+        create_group("my-group".to_string()).unwrap();
+        create_group("my-group".to_string()).unwrap();
+        let groups = list_groups().unwrap();
+        assert_eq!(groups.iter().filter(|g| *g == "my-group").count(), 1, "duplicate group should not be created");
+    }
+
+    #[test]
+    fn test_create_group_empty_name_rejected() {
+        let _tmp = setup_test_env();
+        let result = create_group("   ".to_string());
+        assert!(result.is_err(), "empty group name should be rejected");
+    }
+
+    #[test]
+    fn test_delete_group_removes_name_and_clears_skills() {
+        let _tmp = setup_test_env();
+        // Create group and assign a skill to it
+        create_group("old-group".to_string()).unwrap();
+        let mut config = crate::models::config::load_config().unwrap();
+        let skill_id = make_skill_record(&mut config, "grouped-skill", "/path/grouped-skill");
+        config.skills.iter_mut().find(|s| s.id == skill_id).unwrap().group = Some("old-group".to_string());
+        crate::models::config::save_config(&config).unwrap();
+
+        delete_group("old-group".to_string()).unwrap();
+
+        let groups = list_groups().unwrap();
+        assert!(!groups.contains(&"old-group".to_string()), "deleted group should not appear in list");
+        let config = crate::models::config::load_config().unwrap();
+        let skill = config.skills.iter().find(|s| s.id == skill_id).unwrap();
+        assert_eq!(skill.group, None, "skill.group should be cleared when group is deleted");
+    }
+
+    #[test]
+    fn test_set_skill_group_upserts_to_groups() {
+        let _tmp = setup_test_env();
+        let mut config = crate::models::config::load_config().unwrap();
+        let skill_id = make_skill_record(&mut config, "some-skill", "/path/some-skill");
+        crate::models::config::save_config(&config).unwrap();
+
+        // Assigning a group via set_skill_group should auto-upsert the group name
+        set_skill_group(skill_id.clone(), Some("auto-group".to_string())).unwrap();
+        let groups = list_groups().unwrap();
+        assert!(groups.contains(&"auto-group".to_string()), "set_skill_group should upsert group name to config.groups");
     }
 }

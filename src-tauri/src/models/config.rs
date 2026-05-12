@@ -19,7 +19,6 @@ pub struct ToolPaths {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    pub version: String,
     pub skills: Vec<Skill>,
     pub distributions: Vec<Distribution>,
     pub projects: Vec<Project>,
@@ -27,6 +26,10 @@ pub struct AppConfig {
     /// Paths to skip during discovery scans (supports ~/). Default: ~/.claude/plugins/cache/
     #[serde(default)]
     pub ignored_paths: Vec<String>,
+    /// Explicitly created group names (persists empty groups across restarts).
+    /// Invariant: every skill.group value must appear in this list.
+    #[serde(default)]
+    pub groups: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -66,12 +69,12 @@ impl Default for AppConfig {
         );
 
         Self {
-            version: "1".to_string(),
             skills: Vec::new(),
             distributions: Vec::new(),
             projects: Vec::new(),
             tool_paths,
             ignored_paths: vec!["~/.claude/plugins/cache/".to_string()],
+            groups: Vec::new(),
         }
     }
 }
@@ -160,7 +163,6 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = AppConfig::default();
-        assert_eq!(config.version, "1");
         assert!(config.skills.is_empty());
         assert!(config.distributions.is_empty());
         assert!(config.projects.is_empty());
@@ -206,7 +208,6 @@ mod tests {
         });
         save_config(&config).unwrap();
         let loaded = load_config().unwrap();
-        assert_eq!(loaded.version, "1");
         assert_eq!(loaded.skills.len(), 1);
         assert_eq!(loaded.skills[0].name, "test-skill");
     }
@@ -217,7 +218,6 @@ mod tests {
         // Delete the config file that setup created
         fs::remove_file(config_file_path()).unwrap();
         let config = load_config().unwrap();
-        assert_eq!(config.version, "1");
         assert!(config.skills.is_empty());
         // Config file should now exist
         assert!(config_file_path().exists());
@@ -230,8 +230,8 @@ mod tests {
         // tool_paths keys should be the string names
         assert!(json.contains("\"ClaudeCode\""));
         assert!(json.contains("\"CopilotCLI\""));
-        // version field
-        assert!(json.contains("\"version\""));
+        // version field must not be present (removed as dead code)
+        assert!(!json.contains("\"version\""));
     }
 
     #[test]

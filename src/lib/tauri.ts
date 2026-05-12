@@ -53,6 +53,18 @@ export async function setSkillGroup(id: string, group: string | null): Promise<v
   return invoke("set_skill_group", { id, group });
 }
 
+export async function listGroups(): Promise<string[]> {
+  return invoke("list_groups");
+}
+
+export async function createGroup(name: string): Promise<void> {
+  return invoke("create_group", { name });
+}
+
+export async function deleteGroup(name: string): Promise<void> {
+  return invoke("delete_group", { name });
+}
+
 export async function discoverSkills(): Promise<Skill[]> {
   return invoke("discover_skills");
 }
