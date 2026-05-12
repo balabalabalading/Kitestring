@@ -447,7 +447,6 @@ pub fn pull_skill(skill_id: &str) -> Result<PullResult, String> {
             save_config(&config)?;
         }
     }
-
     Ok(PullResult { new_skills, removed_skills, updated })
 }
 
@@ -590,8 +589,7 @@ pub fn discover_skills_from_tool_paths() -> Result<Vec<Skill>, String> {
         save_config(ctx.config)?;
     }
 
-    Ok(ctx.imported)
-}
+    Ok(ctx.imported)}
 
 /// Find all directories that contain SKILL.md, up to `max_depth` levels deep.
 fn find_skill_dirs_recursive(dir: &Path, max_depth: u32) -> Vec<std::path::PathBuf> {
@@ -804,8 +802,7 @@ pub fn scan_project_folder(
             }
 
             // Create a Project-scoped Distribution for both real folders and symlinks
-            {
-                let tool: Tool = match tool_name.parse() {
+            {                let tool: Tool = match tool_name.parse() {
                     Ok(t) => t,
                     Err(_) => continue,
                 };

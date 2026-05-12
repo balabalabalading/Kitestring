@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::models::dto::{FileNode, PullResultDto};
 use crate::models::skill::Skill;
-use crate::services::importer::{self, ImportGithubResult};
+use crate::services::importer::{self, GithubConflict, ImportGithubResult};
 
 #[tauri::command]
 pub fn import_local_skill(path: String) -> Result<Vec<Skill>, String> {

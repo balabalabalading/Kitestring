@@ -86,8 +86,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       // Fallback heuristic: skill source is directly inside this tool path (no dist record yet)
       const isSourceInToolPath = skill.source_path.startsWith(toolPath + "/");
       if (isSourceInToolPath) {
-        const fakeDist: Distribution = { id: "", skill_id: skill.id, tool, scope: "Project", target_path: toolPath + "/" + skill.name, status: "Linked", entry_type: "Folder" };
-        return [{ skill, dist: fakeDist, isSymlink: false }];
+        const fakeDist: Distribution = { id: "", skill_id: skill.id, tool, scope: "Project", target_path: toolPath + "/" + skill.name, status: "Linked", entry_type: "Folder" };        return [{ skill, dist: fakeDist, isSymlink: false }];
       }
       return [];
     });
@@ -104,8 +103,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     setRedetecting(true);
     setDistError(null);
     try {
-      await tauri.rescanProject(project.id);
-      await reload();
+      await tauri.rescanProject(project.id);      await reload();
       onSkillsUpdated?.();
     } catch (e) {
       setDistError(String(e));
