@@ -1,7 +1,7 @@
 {
-  "name": "agent-nexus",
+  "name": "kitestring",
   "version": "0.1.0",
-  "description": "Unified management and distribution of AI agent skills",
+  "description": "风筝线 — AI Agent 技能包管理与分发",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

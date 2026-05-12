@@ -411,7 +411,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
             <h3 className="text-base font-semibold text-[#1d1d1f]">删除项目</h3>
             <p className="text-sm text-[#424245]">
               确认删除项目「{project.name}」？<br />
-              <span className="text-[#86868b]">不会删除本地文件夹，仅从 AgentNexus 中移除记录。</span>
+              <span className="text-[#86868b]">不会删除本地文件夹，仅从 Kitestring 中移除记录。</span>
             </p>
             {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
             <div className="flex gap-2 justify-end">

@@ -10,8 +10,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/balabalabalading/AgentNexus.git
-cd AgentNexus
+git clone https://github.com/balabalabalading/Kitestring.git
+cd Kitestring
 
 # 安装前端依赖
 pnpm install
@@ -53,8 +53,8 @@ pnpm tauri dev
 ### Getting Started
 
 ```bash
-git clone https://github.com/balabalabalading/AgentNexus.git
-cd AgentNexus
+git clone https://github.com/balabalabalading/Kitestring.git
+cd Kitestring
 pnpm install
 pnpm tauri dev
 ```

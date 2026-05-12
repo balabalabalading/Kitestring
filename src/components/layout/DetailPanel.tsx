@@ -254,7 +254,7 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
           <div className="bg-white rounded-xl shadow-2xl w-80 p-6">
             <h3 className="text-sm font-semibold text-[#1d1d1f] mb-2">删除 Skill</h3>
             <p className="text-xs text-[#424245] mb-1">
-              确认从 AgentNexus 中移除「{skill.name}」？
+              确认从 Kitestring 中移除「{skill.name}」？
             </p>
             <p className="text-xs text-[#86868b] mb-4">
               不会删除本地文件夹。

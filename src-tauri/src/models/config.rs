@@ -97,7 +97,7 @@ fn config_dir() -> PathBuf {
         return override_dir;
     }
     let home = dirs::home_dir().expect("Cannot determine home directory");
-    home.join(".agentnexus")
+    home.join(".kitestring")
 }
 
 fn config_file_path() -> PathBuf {

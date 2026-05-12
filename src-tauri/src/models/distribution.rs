@@ -7,7 +7,7 @@ pub enum EntryType {
     /// A real (non-symlink) directory; the skill source lives directly here.
     #[default]
     Folder,
-    /// A symlink pointing to a skill source elsewhere (local folder or AgentNexus download).
+    /// A symlink pointing to a skill source elsewhere (local folder or Kitestring download).
     Symlink,
 }
 

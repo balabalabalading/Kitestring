@@ -159,9 +159,9 @@ fn normalize_github_url(url: &str) -> String {
 /// Import skills from a Github repository URL.
 /// Returns imported skills plus any conflicts (same-path or same-name existing skills).
 pub fn import_github_skill(url: &str) -> Result<ImportGithubResult, String> {
-    // Clone the repo to ~/.agentnexus/repos/
+    // Clone the repo to ~/.kitestring/repos/
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
-    let repos_dir = home.join(".agentnexus").join("repos");
+    let repos_dir = home.join(".kitestring").join("repos");
     fs::create_dir_all(&repos_dir)
         .map_err(|e| format!("Failed to create repos directory: {e}"))?;
 
