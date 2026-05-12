@@ -11,6 +11,10 @@ use super::project::Project;
 pub struct ToolPaths {
     pub global: String,
     pub project: String,
+    /// Additional directories to scan for skills (e.g. marketplace paths).
+    /// Supports `~/` prefix. Entries are scanned recursively.
+    #[serde(default)]
+    pub extra_globals: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +24,9 @@ pub struct AppConfig {
     pub distributions: Vec<Distribution>,
     pub projects: Vec<Project>,
     pub tool_paths: HashMap<String, ToolPaths>,
+    /// Paths to skip during discovery scans (supports ~/). Default: ~/.claude/plugins/cache/
+    #[serde(default)]
+    pub ignored_paths: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -30,6 +37,7 @@ impl Default for AppConfig {
             ToolPaths {
                 global: "~/.claude/skills/".to_string(),
                 project: ".claude/skills/".to_string(),
+                extra_globals: vec!["~/.claude/plugins/marketplaces".to_string()],
             },
         );
         tool_paths.insert(
@@ -37,6 +45,7 @@ impl Default for AppConfig {
             ToolPaths {
                 global: "~/.copilot/skills/".to_string(),
                 project: ".copilot/skills/".to_string(),
+                extra_globals: vec![],
             },
         );
         tool_paths.insert(
@@ -44,6 +53,7 @@ impl Default for AppConfig {
             ToolPaths {
                 global: "~/.gemini/skills/".to_string(),
                 project: ".gemini/skills/".to_string(),
+                extra_globals: vec![],
             },
         );
         tool_paths.insert(
@@ -51,6 +61,7 @@ impl Default for AppConfig {
             ToolPaths {
                 global: "~/.codex/skills/".to_string(),
                 project: ".codex/skills/".to_string(),
+                extra_globals: vec![],
             },
         );
 
@@ -60,6 +71,7 @@ impl Default for AppConfig {
             distributions: Vec::new(),
             projects: Vec::new(),
             tool_paths,
+            ignored_paths: vec!["~/.claude/plugins/cache/".to_string()],
         }
     }
 }
@@ -99,7 +111,35 @@ pub fn load_config() -> Result<AppConfig, String> {
         return Ok(config);
     }
     let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read config: {e}"))?;
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {e}"))
+    let mut config: AppConfig =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {e}"))?;
+
+    // Migration: ensure all default tool paths are present and extra_globals are populated.
+    // This handles configs created before extra_globals was added, or with missing tool entries.
+    let defaults = AppConfig::default();
+    for (tool, default_paths) in &defaults.tool_paths {
+        let entry = config
+            .tool_paths
+            .entry(tool.clone())
+            .or_insert_with(|| default_paths.clone());
+        // Remove deprecated extra_globals paths (replaced by more specific ones)
+        if tool == "ClaudeCode" {
+            entry.extra_globals.retain(|eg| eg != "~/.claude/plugins/" && eg != "~/.claude/plugins/marketplaces/antv-infographic/skills");
+        }
+        for eg in &default_paths.extra_globals {
+            if !entry.extra_globals.contains(eg) {
+                entry.extra_globals.push(eg.clone());
+            }
+        }
+    }
+    // Migration: ensure default ignored_paths are present
+    for default_path in &defaults.ignored_paths {
+        if !config.ignored_paths.contains(default_path) {
+            config.ignored_paths.push(default_path.clone());
+        }
+    }
+
+    Ok(config)
 }
 
 pub fn save_config(config: &AppConfig) -> Result<(), String> {
@@ -133,6 +173,7 @@ mod tests {
         let claude = config.tool_paths.get("ClaudeCode").unwrap();
         assert_eq!(claude.global, "~/.claude/skills/");
         assert_eq!(claude.project, ".claude/skills/");
+        assert_eq!(claude.extra_globals, vec!["~/.claude/plugins/marketplaces".to_string()]);
 
         let copilot = config.tool_paths.get("CopilotCLI").unwrap();
         assert_eq!(copilot.global, "~/.copilot/skills/");
@@ -158,9 +199,10 @@ mod tests {
             source_type: crate::models::skill::SourceType::Local,
             source_path: "/tmp/test".to_string(),
             github_url: None,
+            has_git: false,
             created_at: "2026-01-01T00:00:00+00:00".to_string(),
             updated_at: "2026-01-01T00:00:00+00:00".to_string(),
-            project_id: None,
+            group: None,
         });
         save_config(&config).unwrap();
         let loaded = load_config().unwrap();

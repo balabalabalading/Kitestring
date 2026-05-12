@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::models::config::{load_config, save_config, ToolPaths};
-use crate::models::distribution::{DistStatus, Distribution, Scope, Tool};
+use crate::models::distribution::{DistStatus, Distribution, EntryType, Scope, Tool};
 
 /// Create a symlink from source skill path to the target tool directory
 pub fn distribute_skill(
@@ -24,43 +24,8 @@ pub fn distribute_skill(
     let target_base = resolve_target_base(&tool_paths, scope, project_id, &config)?;
     let target_path = target_base.join(&skill.name);
 
-    // Check if target already exists
-    if target_path.exists() {
-        let metadata = fs::symlink_metadata(&target_path)
-            .map_err(|e| format!("Failed to read target metadata: {e}"))?;
-
-        if metadata.is_symlink() {
-            // Overwrite existing symlink
-            fs::remove_file(&target_path)
-                .map_err(|e| format!("Failed to remove existing symlink: {e}"))?;
-        } else {
-            return Err(format!(
-                "Target path already exists as a real directory: {}",
-                target_path.display()
-            ));
-        }
-    }
-
-    // Ensure parent directory exists
-    if let Some(parent) = target_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
-        }
-    }
-
-    // Create symlink
     let source_path = Path::new(&skill.source_path);
-    create_symlink(source_path, &target_path)?;
-
-    let dist = Distribution {
-        id: uuid::Uuid::new_v4().to_string(),
-        skill_id: skill_id.to_string(),
-        tool: tool.clone(),
-        scope: scope.clone(),
-        target_path: target_path.to_string_lossy().to_string(),
-        status: DistStatus::Linked,
-    };
+    let dist = create_symlink_distribution(skill_id, source_path, &target_path, tool.clone(), scope.clone())?;
 
     config.distributions.push(dist.clone());
     save_config(&config)?;
@@ -68,7 +33,7 @@ pub fn distribute_skill(
     Ok(dist)
 }
 
-/// Remove a distribution (delete symlink)
+/// Remove a distribution (delete symlink if Symlink type; for Folder type, only removes the record)
 pub fn remove_distribution(dist_id: &str) -> Result<(), String> {
     let mut config = load_config()?;
 
@@ -76,10 +41,13 @@ pub fn remove_distribution(dist_id: &str) -> Result<(), String> {
         .ok_or("Distribution not found")?
         .clone();
 
-    let target = Path::new(&dist.target_path);
-    if target.exists() {
-        fs::remove_file(target)
-            .map_err(|e| format!("Failed to remove symlink: {e}"))?;
+    // Only remove filesystem entry for Symlink type (never delete a real folder)
+    if dist.entry_type == EntryType::Symlink {
+        let target = Path::new(&dist.target_path);
+        if target.exists() || target.symlink_metadata().is_ok() {
+            fs::remove_file(target)
+                .map_err(|e| format!("Failed to remove symlink: {e}"))?;
+        }
     }
 
     config.distributions.retain(|d| d.id != dist_id);
@@ -99,14 +67,34 @@ pub fn check_distribution_status() -> Result<Vec<Distribution>, String> {
             .map(|s| s.source_path.as_str())
             .unwrap_or("");
 
+        if dist.entry_type == EntryType::Folder {
+            // Folder-type distributions: check that the directory still exists.
+            // The target_path IS the source, so just check existence.
+            let new_status = if target.is_dir() {
+                DistStatus::Linked
+            } else {
+                DistStatus::Pending
+            };
+            if dist.status != new_status {
+                dist.status = new_status;
+                changed = true;
+            }
+            continue;
+        }
+
+        // Symlink-type distributions:
         // Use symlink_metadata to distinguish between "no symlink" vs "broken symlink"
         let is_symlink = target.symlink_metadata()
             .map(|m| m.file_type().is_symlink())
             .unwrap_or(false);
 
+        let old_status = dist.status.clone();
+
         if !is_symlink && !target.exists() {
             dist.status = DistStatus::Pending;
-            changed = true;
+            if dist.status != old_status {
+                changed = true;
+            }
             continue;
         }
 
@@ -123,11 +111,13 @@ pub fn check_distribution_status() -> Result<Vec<Distribution>, String> {
                 }
             }
             Err(_) => {
-                // Not a symlink or can't read - it's a real directory
+                // Not a symlink or can't read — treat as broken
                 dist.status = DistStatus::Broken;
             }
         }
-        changed = true;
+        if dist.status != old_status {
+            changed = true;
+        }
     }
 
     if changed {
@@ -156,6 +146,90 @@ fn resolve_target_base(
             Ok(Path::new(&project.path).join(tool_paths.project.trim_start_matches("./")))
         }
     }
+}
+
+/// Distribute a skill to a custom directory path.
+/// Scope is inferred: if target_dir is within a known project path → Project; otherwise → Global.
+pub fn distribute_to_dir(skill_id: &str, tool: &Tool, target_dir: &str) -> Result<Distribution, String> {
+    let mut config = load_config()?;
+
+    let skill = config.skills.iter().find(|s| s.id == skill_id)
+        .ok_or("Skill not found")?
+        .clone();
+
+    let expanded_dir = if target_dir.starts_with("~/") {
+        let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
+        home.join(&target_dir[2..]).to_string_lossy().to_string()
+    } else {
+        target_dir.to_string()
+    };
+
+    let target_path = Path::new(&expanded_dir).join(&skill.name);
+
+    if config.distributions.iter().any(|d| Path::new(&d.target_path) == target_path) {
+        return Err("该路径已分发".to_string());
+    }
+
+    let scope = infer_scope(&expanded_dir, &config);
+    let source_path = Path::new(&skill.source_path);
+    let dist = create_symlink_distribution(skill_id, source_path, &target_path, tool.clone(), scope)?;
+
+    config.distributions.push(dist.clone());
+    save_config(&config)?;
+    Ok(dist)
+}
+
+/// Infer Scope from the target directory: Project if inside a known project path, else Global.
+fn infer_scope(target_dir: &str, config: &crate::models::config::AppConfig) -> Scope {
+    let is_project = config
+        .projects
+        .iter()
+        .filter(|p| !p.path.is_empty())
+        .any(|p| target_dir.starts_with(&p.path));
+    if is_project { Scope::Project } else { Scope::Global }
+}
+
+/// Core logic: validate target path, create parent dirs, create symlink, build Distribution record.
+/// Does NOT push to config or call save_config — callers handle persistence.
+fn create_symlink_distribution(
+    skill_id: &str,
+    source_path: &Path,
+    target_path: &Path,
+    tool: Tool,
+    scope: Scope,
+) -> Result<Distribution, String> {
+    if target_path.exists() {
+        let metadata = fs::symlink_metadata(target_path)
+            .map_err(|e| format!("Failed to read target metadata: {e}"))?;
+        if metadata.is_symlink() {
+            fs::remove_file(target_path)
+                .map_err(|e| format!("Failed to remove existing symlink: {e}"))?;
+        } else {
+            return Err(format!(
+                "目标路径已存在实体目录: {}",
+                target_path.display()
+            ));
+        }
+    }
+
+    if let Some(parent) = target_path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
+        }
+    }
+
+    create_symlink(source_path, target_path)?;
+
+    Ok(Distribution {
+        id: uuid::Uuid::new_v4().to_string(),
+        skill_id: skill_id.to_string(),
+        tool,
+        scope,
+        target_path: target_path.to_string_lossy().to_string(),
+        status: DistStatus::Linked,
+        entry_type: EntryType::Symlink,
+    })
 }
 
 #[cfg(unix)]
@@ -210,9 +284,10 @@ mod tests {
             source_type: crate::models::skill::SourceType::Local,
             source_path: source_path.to_string(),
             github_url: None,
+            has_git: false,
             created_at: "2026-01-01T00:00:00+00:00".to_string(),
             updated_at: "2026-01-01T00:00:00+00:00".to_string(),
-            project_id: None,
+            group: None,
         });
         save_config(&config).unwrap();
         id
@@ -297,7 +372,7 @@ mod tests {
 
         let result = distribute_skill(&skill_id, &Tool::ClaudeCode, &Scope::Global, None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("real directory"));
+        assert!(result.unwrap_err().contains("实体目录"));
     }
 
     #[test]
@@ -323,6 +398,52 @@ mod tests {
         assert!(!Path::new(&dist.target_path).exists());
         let config = load_config().unwrap();
         assert!(config.distributions.is_empty());
+    }
+
+    #[test]
+    fn test_remove_distribution_folder_preserves_directory() {
+        let _tmp = setup();
+        // Create a real directory
+        let real_dir = tempfile::tempdir().unwrap();
+        let real_path = real_dir.path().to_string_lossy().to_string();
+        // Put a file inside to verify it's not deleted
+        fs::write(real_dir.path().join("test.txt"), "data").unwrap();
+
+        let mut config = load_config().unwrap();
+        let skill_id = uuid::Uuid::new_v4().to_string();
+        config.skills.push(crate::models::skill::Skill {
+            id: skill_id.clone(),
+            name: "folder-preserve".to_string(),
+            description: String::new(),
+            source_type: crate::models::skill::SourceType::Local,
+            source_path: real_path.clone(),
+            github_url: None,
+            has_git: false,
+            created_at: "2026-01-01T00:00:00+00:00".to_string(),
+            updated_at: "2026-01-01T00:00:00+00:00".to_string(),
+            group: None,
+        });
+        let dist_id = uuid::Uuid::new_v4().to_string();
+        config.distributions.push(Distribution {
+            id: dist_id.clone(),
+            skill_id: skill_id.clone(),
+            tool: Tool::ClaudeCode,
+            scope: Scope::Global,
+            target_path: real_path.clone(),
+            status: DistStatus::Linked,
+            entry_type: EntryType::Folder,
+        });
+        save_config(&config).unwrap();
+
+        remove_distribution(&dist_id).unwrap();
+
+        // Directory should still exist
+        assert!(Path::new(&real_path).exists(), "Folder-type removal should not delete the real directory");
+        assert!(Path::new(&real_path).join("test.txt").exists(), "Files inside the folder should be preserved");
+
+        // Distribution record should be removed
+        let config = load_config().unwrap();
+        assert!(config.distributions.iter().all(|d| d.id != dist_id), "Distribution record should be removed");
     }
 
     #[test]
@@ -370,6 +491,7 @@ mod tests {
             scope: Scope::Global,
             target_path: format!("{}/nonexistent/skill", _tmp.path().to_string_lossy()),
             status: DistStatus::Linked,
+            entry_type: EntryType::Symlink,
         };
         config.distributions.push(dist);
         save_config(&config).unwrap();
@@ -393,6 +515,76 @@ mod tests {
     }
 
     #[test]
+    fn test_check_status_folder_linked() {
+        let _tmp = setup();
+        // Create a real directory as the distribution target
+        let real_dir = tempfile::tempdir().unwrap();
+        let real_path = real_dir.path().to_string_lossy().to_string();
+
+        let mut config = load_config().unwrap();
+        let skill_id = uuid::Uuid::new_v4().to_string();
+        config.skills.push(crate::models::skill::Skill {
+            id: skill_id.clone(),
+            name: "folder-skill".to_string(),
+            description: String::new(),
+            source_type: crate::models::skill::SourceType::Local,
+            source_path: real_path.clone(),
+            github_url: None,
+            has_git: false,
+            created_at: "2026-01-01T00:00:00+00:00".to_string(),
+            updated_at: "2026-01-01T00:00:00+00:00".to_string(),
+            group: None,
+        });
+        config.distributions.push(Distribution {
+            id: uuid::Uuid::new_v4().to_string(),
+            skill_id: skill_id.clone(),
+            tool: Tool::ClaudeCode,
+            scope: Scope::Global,
+            target_path: real_path.clone(),
+            status: DistStatus::Pending,
+            entry_type: EntryType::Folder,
+        });
+        save_config(&config).unwrap();
+
+        let dists = check_distribution_status().unwrap();
+        let dist = dists.iter().find(|d| d.skill_id == skill_id).unwrap();
+        assert_eq!(dist.status, DistStatus::Linked, "Folder with existing dir should be Linked");
+    }
+
+    #[test]
+    fn test_check_status_folder_pending() {
+        let _tmp = setup();
+        let mut config = load_config().unwrap();
+        let skill_id = uuid::Uuid::new_v4().to_string();
+        config.skills.push(crate::models::skill::Skill {
+            id: skill_id.clone(),
+            name: "missing-folder-skill".to_string(),
+            description: String::new(),
+            source_type: crate::models::skill::SourceType::Local,
+            source_path: "/nonexistent/folder/path".to_string(),
+            github_url: None,
+            has_git: false,
+            created_at: "2026-01-01T00:00:00+00:00".to_string(),
+            updated_at: "2026-01-01T00:00:00+00:00".to_string(),
+            group: None,
+        });
+        config.distributions.push(Distribution {
+            id: uuid::Uuid::new_v4().to_string(),
+            skill_id: skill_id.clone(),
+            tool: Tool::ClaudeCode,
+            scope: Scope::Global,
+            target_path: "/nonexistent/folder/path".to_string(),
+            status: DistStatus::Linked,
+            entry_type: EntryType::Folder,
+        });
+        save_config(&config).unwrap();
+
+        let dists = check_distribution_status().unwrap();
+        let dist = dists.iter().find(|d| d.skill_id == skill_id).unwrap();
+        assert_eq!(dist.status, DistStatus::Pending, "Folder with missing dir should be Pending");
+    }
+
+    #[test]
     fn test_distribute_skill_project_scope_without_id() {
         let _tmp = setup();
         let skill_dir = tempfile::tempdir().unwrap();
@@ -400,5 +592,77 @@ mod tests {
 
         let result = distribute_skill(&skill_id, &Tool::ClaudeCode, &Scope::Project, None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_distribute_to_dir_creates_symlink() {
+        let _tmp = setup();
+        let skill_dir = tempfile::tempdir().unwrap();
+        let target_dir = tempfile::tempdir().unwrap();
+        let skill_id = add_skill_to_config("to-dir-skill", skill_dir.path().to_str().unwrap());
+
+        let dist = distribute_to_dir(&skill_id, &Tool::ClaudeCode, target_dir.path().to_str().unwrap()).unwrap();
+
+        assert_eq!(dist.status, DistStatus::Linked);
+        assert_eq!(dist.scope, Scope::Global);
+        assert_eq!(dist.entry_type, EntryType::Symlink);
+        let target = std::path::Path::new(&dist.target_path);
+        assert!(target.symlink_metadata().unwrap().file_type().is_symlink());
+    }
+
+    #[test]
+    fn test_distribute_to_dir_creates_config_entry() {
+        let _tmp = setup();
+        let skill_dir = tempfile::tempdir().unwrap();
+        let target_dir = tempfile::tempdir().unwrap();
+        let skill_id = add_skill_to_config("to-dir-config", skill_dir.path().to_str().unwrap());
+
+        distribute_to_dir(&skill_id, &Tool::CopilotCLI, target_dir.path().to_str().unwrap()).unwrap();
+
+        let config = load_config().unwrap();
+        assert_eq!(config.distributions.len(), 1);
+        let dist = &config.distributions[0];
+        assert_eq!(dist.skill_id, skill_id);
+        assert_eq!(dist.tool, Tool::CopilotCLI);
+        assert_eq!(dist.scope, Scope::Global);
+        assert_eq!(dist.entry_type, EntryType::Symlink);
+        assert!(dist.target_path.ends_with("to-dir-config"));
+    }
+
+    #[test]
+    fn test_distribute_to_dir_skill_not_found() {
+        let _tmp = setup();
+        let target_dir = tempfile::tempdir().unwrap();
+        let result = distribute_to_dir("nonexistent-id", &Tool::ClaudeCode, target_dir.path().to_str().unwrap());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Skill not found"));
+    }
+
+    #[test]
+    fn test_distribute_to_dir_duplicate_rejected() {
+        let _tmp = setup();
+        let skill_dir = tempfile::tempdir().unwrap();
+        let target_dir = tempfile::tempdir().unwrap();
+        let skill_id = add_skill_to_config("dup-to-dir", skill_dir.path().to_str().unwrap());
+
+        distribute_to_dir(&skill_id, &Tool::ClaudeCode, target_dir.path().to_str().unwrap()).unwrap();
+        let result = distribute_to_dir(&skill_id, &Tool::ClaudeCode, target_dir.path().to_str().unwrap());
+        assert!(result.is_err(), "duplicate distribute_to_dir should be rejected");
+    }
+
+    #[test]
+    fn test_distribute_to_dir_refuses_real_directory() {
+        let _tmp = setup();
+        let skill_dir = tempfile::tempdir().unwrap();
+        let target_dir = tempfile::tempdir().unwrap();
+        let skill_id = add_skill_to_config("real-dir-target", skill_dir.path().to_str().unwrap());
+
+        // Pre-create a real directory at the expected target path (target_dir/skill_name)
+        let real_target = target_dir.path().join("real-dir-target");
+        fs::create_dir_all(&real_target).unwrap();
+
+        let result = distribute_to_dir(&skill_id, &Tool::ClaudeCode, target_dir.path().to_str().unwrap());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("实体目录"), "should reject real directory at target path");
     }
 }

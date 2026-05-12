@@ -28,12 +28,12 @@ export default function CreateProjectDialog({ onCreated, onClose }: CreateProjec
   }
 
   async function handleCreate() {
-    if (!name.trim()) {
-      setError("请输入项目名称");
-      return;
-    }
     if (!path.trim()) {
       setError("请选择项目目录");
+      return;
+    }
+    if (!name.trim()) {
+      setError("请输入项目名称");
       return;
     }
     setLoading(true);
@@ -65,6 +65,27 @@ export default function CreateProjectDialog({ onCreated, onClose }: CreateProjec
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
           <div>
+            <label className="block text-xs font-medium text-[#424245] mb-1">
+              项目目录
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                placeholder="请输入项目路径，或点击按钮选择"
+                className="flex-1 text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400 font-mono text-xs"
+              />
+              <button
+                onClick={handlePickDir}
+                className="text-xs px-3 py-2 rounded-md border border-gray-300 hover:bg-gray-50 text-[#424245] whitespace-nowrap"
+              >
+                选择
+              </button>
+            </div>
+          </div>
+
+          <div>
             <label className="block text-xs font-medium text-[#424245] mb-1">项目名称</label>
             <input
               type="text"
@@ -75,25 +96,6 @@ export default function CreateProjectDialog({ onCreated, onClose }: CreateProjec
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#424245] mb-1">项目目录</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                placeholder="/Users/你/my-project"
-                className="flex-1 text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400 font-mono text-xs"
-              />
-              <button
-                onClick={handlePickDir}
-                className="text-xs px-3 py-2 rounded-md border border-gray-300 hover:bg-gray-50 text-[#424245] whitespace-nowrap"
-              >
-                选择
-              </button>
-            </div>
           </div>
 
           {error && (

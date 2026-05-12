@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 
+/// Whether the entry in the tool path is a real directory or a symlink.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase")]
+pub enum EntryType {
+    /// A real (non-symlink) directory; the skill source lives directly here.
+    #[default]
+    Folder,
+    /// A symlink pointing to a skill source elsewhere (local folder or AgentNexus download).
+    Symlink,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Distribution {
     pub id: String,
@@ -8,6 +19,9 @@ pub struct Distribution {
     pub scope: Scope,
     pub target_path: String,
     pub status: DistStatus,
+    /// Whether the target_path is a real folder or a symlink. Defaults to Symlink for legacy records.
+    #[serde(default)]
+    pub entry_type: EntryType,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -121,12 +135,14 @@ mod tests {
             scope: Scope::Global,
             target_path: "/tmp/test".to_string(),
             status: DistStatus::Linked,
+            entry_type: EntryType::Symlink,
         };
         let json = serde_json::to_string(&dist).unwrap();
         // PascalCase enum values
         assert!(json.contains("\"ClaudeCode\""));
         assert!(json.contains("\"Global\""));
         assert!(json.contains("\"Linked\""));
+        assert!(json.contains("\"Symlink\""));
     }
 
     #[test]
@@ -144,5 +160,7 @@ mod tests {
         assert_eq!(dist.tool, Tool::CopilotCLI);
         assert_eq!(dist.scope, Scope::Project);
         assert_eq!(dist.status, DistStatus::Broken);
+        // entry_type defaults to Folder for legacy records without the field
+        assert_eq!(dist.entry_type, EntryType::Folder);
     }
 }

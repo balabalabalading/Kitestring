@@ -39,8 +39,9 @@ pub fn make_sample_skill(id: &str, name: &str, source_path: &str) -> Skill {
         source_type: SourceType::Local,
         source_path: source_path.to_string(),
         github_url: None,
+        has_git: false,
         created_at: "2026-01-01T00:00:00+00:00".to_string(),
         updated_at: "2026-01-01T00:00:00+00:00".to_string(),
-        project_id: None,
+        group: None,
     }
 }

@@ -7,6 +7,13 @@ pub fn get_app_config() -> Result<AppConfig, String> {
 }
 
 #[tauri::command]
+pub fn get_home_dir() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or("Cannot determine home directory".to_string())
+}
+
+#[tauri::command]
 pub fn update_tool_paths(tool_paths: HashMap<String, serde_json::Value>) -> Result<(), String> {
     let mut config = crate::models::config::load_config()?;
     for (tool, paths_val) in tool_paths {
@@ -21,9 +28,17 @@ pub fn update_tool_paths(tool_paths: HashMap<String, serde_json::Value>) -> Resu
         let entry = config.tool_paths.entry(tool).or_insert_with(|| crate::models::config::ToolPaths {
             global: String::new(),
             project: String::new(),
+            extra_globals: vec![],
         });
         entry.global = global;
         entry.project = project;
     }
+    crate::models::config::save_config(&config)
+}
+
+#[tauri::command]
+pub fn update_ignored_paths(ignored_paths: Vec<String>) -> Result<(), String> {
+    let mut config = crate::models::config::load_config()?;
+    config.ignored_paths = ignored_paths;
     crate::models::config::save_config(&config)
 }

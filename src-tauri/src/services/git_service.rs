@@ -6,6 +6,7 @@ pub struct GitInfo {
     pub commit_count: usize,
     pub last_commit_time: Option<String>,
     pub is_git_repo: bool,
+    pub remote_url: Option<String>,
 }
 
 /// Get git information for a given path
@@ -19,6 +20,7 @@ pub fn get_git_info(path: &str) -> Result<GitInfo, String> {
                 commit_count: 0,
                 last_commit_time: None,
                 is_git_repo: false,
+                remote_url: None,
             });
         }
     };
@@ -40,11 +42,16 @@ pub fn get_git_info(path: &str) -> Result<GitInfo, String> {
             Some(utc.to_rfc3339())
         });
 
+    let remote_url = repo.find_remote("origin")
+        .ok()
+        .and_then(|r| r.url().map(|s| s.to_string()));
+
     Ok(GitInfo {
         branch,
         commit_count,
         last_commit_time,
         is_git_repo: true,
+        remote_url,
     })
 }
 

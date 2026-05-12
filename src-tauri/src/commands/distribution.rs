@@ -13,6 +13,12 @@ pub fn distribute_skill(
 }
 
 #[tauri::command]
+pub fn distribute_to_dir(skill_id: String, tool: String, target_dir: String) -> Result<Distribution, String> {
+    let tool: Tool = tool.parse().map_err(|e: String| e)?;
+    crate::services::distributor::distribute_to_dir(&skill_id, &tool, &target_dir)
+}
+
+#[tauri::command]
 pub fn remove_distribution(id: String) -> Result<(), String> {
     crate::services::distributor::remove_distribution(&id)
 }

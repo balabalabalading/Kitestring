@@ -39,16 +39,16 @@ pub fn find_skill_md_files(dir: &Path) -> Vec<std::path::PathBuf> {
 }
 
 fn scan_for_skill_md(dir: &Path, results: &mut Vec<std::path::PathBuf>, depth: usize) {
-    if depth > 3 {
+    if depth > 5 {
         return;
     }
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                // Skip hidden directories and common non-skill dirs
+                // Skip only .git and known non-skill build dirs; keep other hidden dirs (e.g. .agents, .claude)
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with('.') || name == "node_modules" || name == "target" {
+                    if name == ".git" || name == "node_modules" || name == "target" {
                         continue;
                     }
                 }
@@ -60,7 +60,8 @@ fn scan_for_skill_md(dir: &Path, results: &mut Vec<std::path::PathBuf>, depth: u
     }
 }
 
-/// Extract YAML-like front matter from markdown content
+/// Extract YAML-like front matter from markdown content.
+/// Supports simple `key: value` pairs and block scalars (`key: |` and `key: >`).
 fn extract_front_matter(content: &str) -> Result<(std::collections::HashMap<String, String>, String), String> {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
@@ -73,19 +74,71 @@ fn extract_front_matter(content: &str) -> Result<(std::collections::HashMap<Stri
         let body = after_open[end_idx + 3..].trim().to_string();
 
         let mut map = std::collections::HashMap::new();
-        for line in fm_str.lines() {
-            let line = line.trim();
+        let lines: Vec<&str> = fm_str.lines().collect();
+        let mut i = 0;
+
+        while i < lines.len() {
+            let line = lines[i].trim();
             if line.is_empty() || line.starts_with('#') {
+                i += 1;
                 continue;
             }
+
             if let Some(colon_pos) = line.find(':') {
                 let key = line[..colon_pos].trim().to_string();
-                let value = line[colon_pos + 1..].trim().to_string();
-                if !key.is_empty() {
-                    map.insert(key, value);
+                let raw_value = line[colon_pos + 1..].trim();
+
+                if key.is_empty() {
+                    i += 1;
+                    continue;
                 }
+
+                // Detect YAML block scalar: `key: |` or `key: >` (with optional strip `-` / keep `+` chars)
+                let is_literal = raw_value == "|" || raw_value == "|-" || raw_value == "|+";
+                let is_folded = raw_value == ">" || raw_value == ">-" || raw_value == ">+";
+
+                if is_literal || is_folded {
+                    let mut block_lines: Vec<String> = Vec::new();
+                    i += 1;
+                    while i < lines.len() {
+                        let raw_line = lines[i];
+                        // A non-empty, non-indented line signals end of block scalar
+                        if !raw_line.is_empty() && !raw_line.starts_with(' ') && !raw_line.starts_with('\t') {
+                            break;
+                        }
+                        // Strip 2-space indentation (standard YAML block indent)
+                        let stripped = if raw_line.len() >= 2 && raw_line.starts_with("  ") {
+                            &raw_line[2..]
+                        } else {
+                            raw_line.trim_start()
+                        };
+                        block_lines.push(stripped.to_string());
+                        i += 1;
+                    }
+
+                    // Trim trailing blank lines
+                    while block_lines.last().map(|l: &String| l.trim().is_empty()).unwrap_or(false) {
+                        block_lines.pop();
+                    }
+
+                    let value = if is_folded {
+                        // Folded: collapse newlines to spaces
+                        block_lines.iter().map(|l| l.trim_end().to_string()).collect::<Vec<_>>().join(" ")
+                    } else {
+                        // Literal: preserve newlines
+                        block_lines.join("\n")
+                    };
+
+                    map.insert(key, value);
+                } else {
+                    map.insert(key, raw_value.to_string());
+                    i += 1;
+                }
+            } else {
+                i += 1;
             }
         }
+
         Ok((map, body))
     } else {
         Ok((std::collections::HashMap::new(), content.to_string()))
@@ -191,8 +244,8 @@ mod tests {
     #[test]
     fn test_find_skill_md_max_depth() {
         let tmp = tempfile::tempdir().unwrap();
-        // depth 4: should not be found
-        let deep = tmp.path().join("a").join("b").join("c").join("d");
+        // depth 6 (a/b/c/d/e/f): should not be found (max depth is 5)
+        let deep = tmp.path().join("a").join("b").join("c").join("d").join("e").join("f");
         fs::create_dir_all(&deep).unwrap();
         fs::write(deep.join("SKILL.md"), "---\nname: deep\n---\n").unwrap();
         let results = find_skill_md_files(tmp.path());
@@ -200,22 +253,69 @@ mod tests {
     }
 
     #[test]
-    fn test_find_skill_md_skips_hidden() {
+    fn test_find_skill_md_skips_only_git_and_build_dirs() {
         let tmp = tempfile::tempdir().unwrap();
-        // hidden dir
-        let hidden = tmp.path().join(".hidden");
-        fs::create_dir_all(&hidden).unwrap();
-        fs::write(hidden.join("SKILL.md"), "---\nname: hidden\n---\n").unwrap();
-        // node_modules
+        // .git should be skipped
+        let git = tmp.path().join(".git");
+        fs::create_dir_all(&git).unwrap();
+        fs::write(git.join("SKILL.md"), "---\nname: git\n---\n").unwrap();
+        // node_modules should be skipped
         let nm = tmp.path().join("node_modules");
         fs::create_dir_all(&nm).unwrap();
         fs::write(nm.join("SKILL.md"), "---\nname: nm\n---\n").unwrap();
-        // target
+        // target should be skipped
         let target = tmp.path().join("target");
         fs::create_dir_all(&target).unwrap();
         fs::write(target.join("SKILL.md"), "---\nname: target\n---\n").unwrap();
+        // .agents should NOT be skipped (hidden but not .git)
+        let agents = tmp.path().join(".agents").join("skills").join("my-skill");
+        fs::create_dir_all(&agents).unwrap();
+        fs::write(agents.join("SKILL.md"), "---\nname: agents-skill\n---\n").unwrap();
         let results = find_skill_md_files(tmp.path());
-        assert!(results.is_empty());
+        assert_eq!(results.len(), 1);
+        assert!(results[0].to_string_lossy().contains("agents-skill") || results[0].to_string_lossy().contains(".agents"));
+    }
+
+    #[test]
+    fn test_find_skill_md_deep_hidden_path() {
+        // Simulate oz-skills structure: project/.agents/skills/skill-A/SKILL.md (depth 4)
+        let tmp = tempfile::tempdir().unwrap();
+        let deep = tmp.path().join("project").join(".agents").join("skills").join("skill-a");
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(deep.join("SKILL.md"), "---\nname: deep-skill\n---\n").unwrap();
+        let results = find_skill_md_files(tmp.path());
+        assert_eq!(results.len(), 1);
+        assert!(results[0].to_string_lossy().contains("skill-a"));
+    }
+
+    #[test]
+    fn test_parse_block_scalar_literal() {
+        let content = "---\nname: test\ndescription: |\n  Line one.\n  Line two.\n  Line three.\n---\n";
+        let (fm, _) = extract_front_matter(content).unwrap();
+        let desc = fm.get("description").unwrap();
+        assert!(desc.contains("Line one."), "got: {desc}");
+        assert!(desc.contains("Line two."), "got: {desc}");
+        assert!(desc.contains("Line three."), "got: {desc}");
+    }
+
+    #[test]
+    fn test_parse_block_scalar_folded() {
+        let content = "---\nname: test\ndescription: >\n  Word one word two\n  word three.\n---\n";
+        let (fm, _) = extract_front_matter(content).unwrap();
+        let desc = fm.get("description").unwrap();
+        // Folded: joined with space, not newline
+        assert!(desc.contains("Word one word two"), "got: {desc}");
+        assert!(desc.contains("word three."), "got: {desc}");
+    }
+
+    #[test]
+    fn test_parse_block_scalar_with_colons_in_value() {
+        // Trigger words with colons shouldn't break the key parser
+        let content = "---\nname: hv-analysis\ndescription: |\n  触发词包括：横纵分析、研究一下。\n  Use this skill when: you need deep research.\n---\n";
+        let (fm, _) = extract_front_matter(content).unwrap();
+        let desc = fm.get("description").unwrap();
+        assert!(desc.contains("触发词包括"), "got: {desc}");
+        assert!(desc.contains("when: you need"), "got: {desc}");
     }
 
     #[test]
