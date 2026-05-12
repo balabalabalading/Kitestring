@@ -31,7 +31,7 @@ pub fn parse_skill_md(path: &Path) -> Result<SkillMeta, String> {
     Ok(SkillMeta { name, description })
 }
 
-/// Find all SKILL.md files in a directory (recursive, max depth 3)
+/// Find all SKILL.md files in a directory (recursive, max depth 5)
 pub fn find_skill_md_files(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut results = Vec::new();
     scan_for_skill_md(dir, &mut results, 0);

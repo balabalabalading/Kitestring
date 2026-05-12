@@ -1,6 +1,7 @@
 use std::path::Path;
 
 /// Expand ~ to home directory in a path string
+#[allow(dead_code)]
 pub fn expand_home(path: &str) -> Option<String> {
     if path.starts_with("~/") {
         let home = dirs::home_dir()?;
@@ -12,6 +13,7 @@ pub fn expand_home(path: &str) -> Option<String> {
 }
 
 /// Check if a path is a symlink
+#[allow(dead_code)]
 pub fn is_symlink(path: &Path) -> bool {
     path.symlink_metadata()
         .map(|m| m.file_type().is_symlink())

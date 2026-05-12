@@ -31,6 +31,7 @@ pub fn create_nested_skill_md(base: &Path, skill_dir: &str, name: &str, desc: &s
 }
 
 /// Build a sample Skill struct for testing.
+#[allow(dead_code)]
 pub fn make_sample_skill(id: &str, name: &str, source_path: &str) -> Skill {
     Skill {
         id: id.to_string(),
