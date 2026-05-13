@@ -36,6 +36,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupSelectedSkills, setNewGroupSelectedSkills] = useState<Set<string>>(new Set());
+  const [newGroupSearch, setNewGroupSearch] = useState("");
   // Per-group collapse state, persisted in localStorage
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
@@ -360,7 +361,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
               <div className="relative import-popover-root shrink-0 flex items-center gap-0.5">
                 {/* Create group icon */}
                 <button
-                  onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setShowCreateGroupDialog(true); }}
+                  onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
                   title="创建分组"
                   className="w-6 h-6 rounded-md hover:bg-gray-200 flex items-center justify-center text-[#86868b] hover:text-[#1d1d1f] transition-colors"
                 >
@@ -575,81 +576,123 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
       </aside>
 
       {/* Create group dialog */}
-      {showCreateGroupDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-80 flex flex-col max-h-[80vh]">
-            <div className="px-5 py-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">创建分组</h3>
-            </div>
-            <div className="px-5 py-4 space-y-4 overflow-y-auto">
-              <div>
-                <label className="block text-xs font-medium text-[#424245] mb-1">分组名称</label>
-                <input
-                  type="text"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="未命名"
-                  className="w-full text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
-                  autoFocus
-                />
+      {showCreateGroupDialog && (() => {
+        // Only ungrouped skills are candidates
+        const candidateSkills = skills.filter((s) => !s.group).sort((a, b) => a.name.localeCompare(b.name));
+        const lowerSearch = newGroupSearch.trim().toLowerCase();
+        // When searching: show skills matching query (preserve checked state)
+        // When not searching: selected first (sorted), then unselected (sorted)
+        let visibleSkills: typeof candidateSkills;
+        if (lowerSearch) {
+          visibleSkills = candidateSkills.filter((s) =>
+            s.name.toLowerCase().includes(lowerSearch)
+          );
+        } else {
+          const selected = candidateSkills.filter((s) => newGroupSelectedSkills.has(s.id));
+          const unselected = candidateSkills.filter((s) => !newGroupSelectedSkills.has(s.id));
+          visibleSkills = [...selected, ...unselected];
+        }
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-xl shadow-2xl w-80 flex flex-col max-h-[80vh]">
+              <div className="px-5 py-4 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-[#1d1d1f]">创建分组</h3>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-[#424245] mb-1.5">
-                  选择 Skills
-                  <span className="ml-1 font-normal text-[#86868b]">（至少选一个）</span>
-                </label>
-                <div className="rounded-md border border-gray-200 divide-y divide-gray-100 max-h-48 overflow-y-auto">
-                  {[
-                    ...skills.filter((s) => !s.group).sort((a, b) => a.name.localeCompare(b.name)),
-                    ...skills.filter((s) => !!s.group).sort((a, b) => a.name.localeCompare(b.name)),
-                  ].map((skill) => (
-                    <label
-                      key={skill.id}
-                      className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 select-none"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={newGroupSelectedSkills.has(skill.id)}
-                        onChange={(e) => {
-                          setNewGroupSelectedSkills((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) next.add(skill.id);
-                            else next.delete(skill.id);
-                            return next;
-                          });
-                        }}
-                        className="w-3.5 h-3.5 rounded accent-[#1d1d1f] shrink-0"
-                      />
-                      <span className="text-xs text-[#1d1d1f] truncate flex-1">{skill.name}</span>
-                      {skill.group && (
-                        <span className="text-[9px] text-[#86868b] bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{skill.group}</span>
-                      )}
+              <div className="px-5 py-4 space-y-4 overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-medium text-[#424245] mb-1">分组名称</label>
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="未命名"
+                    className="w-full text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <label className="text-xs font-medium text-[#424245]">
+                      选择 Skills
+                      <span className="ml-1 font-normal text-[#86868b]">（至少选一个）</span>
                     </label>
-                  ))}
-                  {skills.length === 0 && (
-                    <div className="px-3 py-3 text-xs text-[#86868b]">暂无 Skills</div>
-                  )}
+                    {newGroupSelectedSkills.size > 0 && (
+                      <span className="text-[10px] text-blue-500">{newGroupSelectedSkills.size} 已选</span>
+                    )}
+                  </div>
+                  {/* Search box */}
+                  <div className="relative mb-1.5">
+                    <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#86868b] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={newGroupSearch}
+                      onChange={(e) => setNewGroupSearch(e.target.value)}
+                      placeholder="搜索 Skills..."
+                      className="w-full text-xs pl-6 pr-2 py-1.5 rounded-md border border-gray-200 focus:outline-none focus:border-blue-400 text-[#1d1d1f] placeholder-[#86868b]"
+                    />
+                    {newGroupSearch && (
+                      <button
+                        onClick={() => setNewGroupSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[#86868b] hover:text-[#1d1d1f]"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-md border border-gray-200 divide-y divide-gray-100 max-h-44 overflow-y-auto">
+                    {visibleSkills.map((skill) => (
+                      <label
+                        key={skill.id}
+                        className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newGroupSelectedSkills.has(skill.id)}
+                          onChange={(e) => {
+                            setNewGroupSelectedSkills((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(skill.id);
+                              else next.delete(skill.id);
+                              return next;
+                            });
+                          }}
+                          className="w-3.5 h-3.5 rounded accent-[#1d1d1f] shrink-0"
+                        />
+                        <span className="text-xs text-[#1d1d1f] truncate flex-1">{skill.name}</span>
+                      </label>
+                    ))}
+                    {candidateSkills.length === 0 && (
+                      <div className="px-3 py-3 text-xs text-[#86868b]">暂无未分组的 Skills</div>
+                    )}
+                    {candidateSkills.length > 0 && visibleSkills.length === 0 && lowerSearch && (
+                      <div className="px-3 py-3 text-xs text-[#86868b]">没有匹配「{newGroupSearch}」的 Skill</div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
-              <button
-                onClick={() => { setShowCreateGroupDialog(false); setNewGroupName(""); setNewGroupSelectedSkills(new Set()); }}
-                className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleCreateGroup}
-                disabled={!newGroupName.trim() || newGroupSelectedSkills.size === 0}
-                className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245] disabled:opacity-40"
-              >
-                创建
-              </button>
+              <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
+                <button
+                  onClick={() => { setShowCreateGroupDialog(false); setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); }}
+                  className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleCreateGroup}
+                  disabled={!newGroupName.trim() || newGroupSelectedSkills.size === 0}
+                  className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245] disabled:opacity-40"
+                >
+                  创建
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Grouping dialog */}
       {showGroupDialog && (
