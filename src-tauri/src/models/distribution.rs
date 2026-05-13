@@ -31,6 +31,7 @@ pub enum Tool {
     CopilotCLI,
     GeminiCLI,
     Codex,
+    #[serde(alias = "AgentsCLI")]
     AgentFolder,
 }
 

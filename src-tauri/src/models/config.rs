@@ -122,6 +122,8 @@ pub fn load_config() -> Result<AppConfig, String> {
         return Ok(config);
     }
     let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read config: {e}"))?;
+    // Migration: rename legacy "AgentsCLI" key to "AgentFolder" in raw JSON before parsing.
+    let content = content.replace("\"AgentsCLI\"", "\"AgentFolder\"");
     let mut config: AppConfig =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {e}"))?;
 
