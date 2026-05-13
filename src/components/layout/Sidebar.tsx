@@ -35,6 +35,16 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
   const [serverGroups, setServerGroups] = useState<string[]>([]);
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupSelectedSkills, setNewGroupSelectedSkills] = useState<Set<string>>(new Set());
+  // Per-group collapse state, persisted in localStorage
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("kitestring_collapsed_groups");
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
   // Drag-over group
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   // GitHub import conflict handling
@@ -167,15 +177,33 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
 
   async function handleCreateGroup() {
     const name = newGroupName.trim();
-    if (!name) return;
+    if (!name || newGroupSelectedSkills.size === 0) return;
     try {
       await tauri.createGroup(name);
+      await Promise.all([...newGroupSelectedSkills].map((id) => tauri.setSkillGroup(id, name)));
       setServerGroups((prev) => prev.includes(name) ? prev : [...prev, name]);
+      await loadData();
     } catch (e) {
       console.error("Failed to create group:", e);
     }
     setShowCreateGroupDialog(false);
     setNewGroupName("");
+    setNewGroupSelectedSkills(new Set());
+  }
+
+  function toggleGroupCollapse(label: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      try {
+        localStorage.setItem("kitestring_collapsed_groups", JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
   }
 
   async function handleDeleteGroup(name: string) {
@@ -332,7 +360,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
               <div className="relative import-popover-root shrink-0 flex items-center gap-0.5">
                 {/* Create group icon */}
                 <button
-                  onClick={() => { setNewGroupName(""); setShowCreateGroupDialog(true); }}
+                  onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setShowCreateGroupDialog(true); }}
                   title="创建分组"
                   className="w-6 h-6 rounded-md hover:bg-gray-200 flex items-center justify-center text-[#86868b] hover:text-[#1d1d1f] transition-colors"
                 >
@@ -448,6 +476,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
                 {allGroupLabels.map((groupLabel) => {
                   const groupSkills = groupedSkills.get(groupLabel) ?? [];
                   const isOver = dragOverGroup === groupLabel;
+                  const isGroupCollapsed = collapsedGroups.has(groupLabel);
                   return (
                     <div key={groupLabel}>
                       <div
@@ -460,15 +489,28 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
                           isOver ? "bg-blue-50 text-blue-500" : ""
                         }`}
                       >
+                        {/* Collapse/expand toggle */}
+                        <button
+                          onClick={() => toggleGroupCollapse(groupLabel)}
+                          className="shrink-0 text-[#86868b] hover:text-[#1d1d1f] transition-colors"
+                          title={isGroupCollapsed ? "展开分组" : "折叠分组"}
+                        >
+                          <svg className={`w-2.5 h-2.5 transition-transform ${isGroupCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                          </svg>
+                        </button>
                         <svg className="w-2.5 h-2.5 shrink-0 opacity-60" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                         </svg>
                         <span className="truncate">{groupLabel}</span>
+                        {!isOver && (
+                          <span className="ml-auto text-[9px] normal-case font-normal opacity-60 shrink-0">{groupSkills.length}</span>
+                        )}
                         {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
                         {!isOver && groupSkills.length === 0 && (
                           <button
                             onClick={() => handleDeleteGroup(groupLabel)}
-                            className="ml-auto text-[#86868b] hover:text-red-500 transition-colors"
+                            className="text-[#86868b] hover:text-red-500 transition-colors"
                             title="删除空分组"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -477,7 +519,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
                           </button>
                         )}
                       </div>
-                      {groupSkills.map((skill) => (
+                      {!isGroupCollapsed && groupSkills.map((skill) => (
                         <SkillItem
                           key={skill.id}
                           skill={skill}
@@ -535,33 +577,71 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
       {/* Create group dialog */}
       {showCreateGroupDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-72 flex flex-col">
+          <div className="bg-white rounded-xl shadow-2xl w-80 flex flex-col max-h-[80vh]">
             <div className="px-5 py-4 border-b border-gray-200">
               <h3 className="text-sm font-semibold text-[#1d1d1f]">创建分组</h3>
             </div>
-            <div className="px-5 py-4">
-              <label className="block text-xs font-medium text-[#424245] mb-1">分组名称</label>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="未命名"
-                className="w-full text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && newGroupName.trim() && handleCreateGroup()}
-              />
-              <p className="text-[11px] text-[#86868b] mt-1.5">创建后可将 Skills 拖入该分组</p>
+            <div className="px-5 py-4 space-y-4 overflow-y-auto">
+              <div>
+                <label className="block text-xs font-medium text-[#424245] mb-1">分组名称</label>
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="未命名"
+                  className="w-full text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#424245] mb-1.5">
+                  选择 Skills
+                  <span className="ml-1 font-normal text-[#86868b]">（至少选一个）</span>
+                </label>
+                <div className="rounded-md border border-gray-200 divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                  {[
+                    ...skills.filter((s) => !s.group).sort((a, b) => a.name.localeCompare(b.name)),
+                    ...skills.filter((s) => !!s.group).sort((a, b) => a.name.localeCompare(b.name)),
+                  ].map((skill) => (
+                    <label
+                      key={skill.id}
+                      className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 select-none"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newGroupSelectedSkills.has(skill.id)}
+                        onChange={(e) => {
+                          setNewGroupSelectedSkills((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(skill.id);
+                            else next.delete(skill.id);
+                            return next;
+                          });
+                        }}
+                        className="w-3.5 h-3.5 rounded accent-[#1d1d1f] shrink-0"
+                      />
+                      <span className="text-xs text-[#1d1d1f] truncate flex-1">{skill.name}</span>
+                      {skill.group && (
+                        <span className="text-[9px] text-[#86868b] bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{skill.group}</span>
+                      )}
+                    </label>
+                  ))}
+                  {skills.length === 0 && (
+                    <div className="px-3 py-3 text-xs text-[#86868b]">暂无 Skills</div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
               <button
-                onClick={() => setShowCreateGroupDialog(false)}
+                onClick={() => { setShowCreateGroupDialog(false); setNewGroupName(""); setNewGroupSelectedSkills(new Set()); }}
                 className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
               >
                 取消
               </button>
               <button
                 onClick={handleCreateGroup}
-                disabled={!newGroupName.trim()}
+                disabled={!newGroupName.trim() || newGroupSelectedSkills.size === 0}
                 className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245] disabled:opacity-40"
               >
                 创建
