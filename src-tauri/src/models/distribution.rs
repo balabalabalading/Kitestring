@@ -31,6 +31,7 @@ pub enum Tool {
     CopilotCLI,
     GeminiCLI,
     Codex,
+    AgentFolder,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,6 +56,7 @@ impl std::fmt::Display for Tool {
             Tool::CopilotCLI => write!(f, "CopilotCLI"),
             Tool::GeminiCLI => write!(f, "GeminiCLI"),
             Tool::Codex => write!(f, "Codex"),
+            Tool::AgentFolder => write!(f, "AgentFolder"),
         }
     }
 }
@@ -67,6 +69,7 @@ impl std::str::FromStr for Tool {
             "CopilotCLI" => Ok(Tool::CopilotCLI),
             "GeminiCLI" => Ok(Tool::GeminiCLI),
             "Codex" => Ok(Tool::Codex),
+            "AgentFolder" => Ok(Tool::AgentFolder),
             _ => Err(format!("Unknown tool: {s}")),
         }
     }
@@ -102,6 +105,7 @@ mod tests {
         assert_eq!(Tool::CopilotCLI.to_string(), "CopilotCLI");
         assert_eq!(Tool::GeminiCLI.to_string(), "GeminiCLI");
         assert_eq!(Tool::Codex.to_string(), "Codex");
+        assert_eq!(Tool::AgentFolder.to_string(), "AgentFolder");
     }
 
     #[test]
@@ -110,6 +114,7 @@ mod tests {
         assert_eq!("CopilotCLI".parse::<Tool>(), Ok(Tool::CopilotCLI));
         assert_eq!("GeminiCLI".parse::<Tool>(), Ok(Tool::GeminiCLI));
         assert_eq!("Codex".parse::<Tool>(), Ok(Tool::Codex));
+        assert_eq!("AgentFolder".parse::<Tool>(), Ok(Tool::AgentFolder));
         assert!("UnknownTool".parse::<Tool>().is_err());
     }
 

@@ -67,6 +67,14 @@ impl Default for AppConfig {
                 extra_globals: vec![],
             },
         );
+        tool_paths.insert(
+            "AgentFolder".to_string(),
+            ToolPaths {
+                global: "~/.agents/skills/".to_string(),
+                project: ".agents/skills/".to_string(),
+                extra_globals: vec![],
+            },
+        );
 
         Self {
             skills: Vec::new(),
@@ -166,7 +174,7 @@ mod tests {
         assert!(config.skills.is_empty());
         assert!(config.distributions.is_empty());
         assert!(config.projects.is_empty());
-        assert_eq!(config.tool_paths.len(), 4);
+        assert_eq!(config.tool_paths.len(), 5);
     }
 
     #[test]
@@ -188,6 +196,11 @@ mod tests {
         let codex = config.tool_paths.get("Codex").unwrap();
         assert_eq!(codex.global, "~/.codex/skills/");
         assert_eq!(codex.project, ".codex/skills/");
+
+        let agents = config.tool_paths.get("AgentFolder").unwrap();
+        assert_eq!(agents.global, "~/.agents/skills/");
+        assert_eq!(agents.project, ".agents/skills/");
+        assert!(agents.extra_globals.is_empty());
     }
 
     #[test]
@@ -230,6 +243,7 @@ mod tests {
         // tool_paths keys should be the string names
         assert!(json.contains("\"ClaudeCode\""));
         assert!(json.contains("\"CopilotCLI\""));
+        assert!(json.contains("\"AgentFolder\""));
         // version field must not be present (removed as dead code)
         assert!(!json.contains("\"version\""));
     }

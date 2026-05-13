@@ -3,8 +3,8 @@ import type { Project, Skill, Distribution, AppConfig } from "../../types";
 import { TOOL_DISPLAY_NAMES } from "../../types";
 import * as tauri from "../../lib/tauri";
 
-type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex";
-const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex"];
+type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
+const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
 
 interface ProjectPanelProps {
   project: Project;

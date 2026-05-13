@@ -11,7 +11,7 @@ interface DetailPanelProps {
   onSkillPulled: () => void;
 }
 
-const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex"];
+const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
 
 export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: DetailPanelProps) {
   const [distributions, setDistributions] = useState<Distribution[]>([]);

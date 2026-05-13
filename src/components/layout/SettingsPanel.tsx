@@ -7,12 +7,13 @@ interface SettingsPanelProps {
   onSkillsCleared?: () => void;
 }
 
-const TOOLS = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex"] as const;
+const TOOLS = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"] as const;
 const TOOL_LABELS: Record<string, string> = {
   ClaudeCode: "Claude Code",
   CopilotCLI: "Copilot CLI",
   GeminiCLI: "Gemini CLI",
   Codex: "Codex",
+  AgentFolder: "Agent Folder",
 };
 
 export default function SettingsPanel({ onClose, onSkillsCleared }: SettingsPanelProps) {

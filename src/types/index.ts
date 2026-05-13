@@ -11,7 +11,7 @@ export interface Skill {
   group: string | null;
 }
 
-export type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex";
+export type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
 export type Scope = "Global" | "Project";
 export type DistStatus = "Linked" | "Broken" | "Pending";
 export type EntryType = "Folder" | "Symlink";
@@ -62,4 +62,5 @@ export const TOOL_DISPLAY_NAMES: Record<Tool, string> = {
   CopilotCLI: "Copilot CLI",
   GeminiCLI: "Gemini CLI",
   Codex: "Codex",
+  AgentFolder: "Agent Folder",
 };
