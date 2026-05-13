@@ -730,6 +730,27 @@ pub fn scan_project_folder(
     let mut imported = Vec::new();
     let mut config_changed = false;
 
+    // Build a set of all global + extra_globals absolute paths so we can skip entries
+    // whose real path already falls under a user-level tool path (avoids duplicating
+    // skills that are already registered via discover_skills_from_tool_paths).
+    let home = dirs::home_dir().unwrap_or_default();
+    let global_abs_paths: Vec<std::path::PathBuf> = config.tool_paths.values()
+        .flat_map(|tp| {
+            let mut paths = vec![];
+            let global = tp.global.trim_start_matches("~/");
+            if !global.is_empty() {
+                paths.push(if tp.global.starts_with("~/") { home.join(global) } else { std::path::PathBuf::from(global) });
+            }
+            for eg in &tp.extra_globals {
+                let eg_rel = eg.trim_start_matches("~/");
+                if !eg_rel.is_empty() {
+                    paths.push(if eg.starts_with("~/") { home.join(eg_rel) } else { std::path::PathBuf::from(eg_rel) });
+                }
+            }
+            paths
+        })
+        .collect();
+
     // Snapshot tool configs before mutating config
     let tool_configs: Vec<(String, String)> = config.tool_paths.iter()
         .map(|(k, v)| (k.clone(), v.project.clone()))
@@ -773,6 +794,12 @@ pub fn scan_project_folder(
             }
 
             let real_path_str = real_path.to_string_lossy().to_string();
+
+            // Skip entries whose real path falls under a global/extra_globals tool path —
+            // those skills are already discovered and registered at user scope.
+            if global_abs_paths.iter().any(|gp| real_path.starts_with(gp)) {
+                continue;
+            }
 
             let skill_id = match find_or_import_skill(
                 &real_path,

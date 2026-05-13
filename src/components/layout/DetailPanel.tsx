@@ -132,9 +132,16 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
   function getCustomDists(tool: Tool): Distribution[] {
     const globalPath = getExpandedGlobalPath(tool);
     const extraExpandedPaths = getExpandedExtraGlobals(tool).map((e) => e.path);
-    return skillDists.filter(
-      (d) => d.tool === tool && d.target_path !== globalPath && !extraExpandedPaths.includes(d.target_path)
-    );
+    const projPath = getProjectRelativeSourcePath(tool);
+    return skillDists.filter((d) => {
+      if (d.tool !== tool) return false;
+      if (d.target_path === globalPath) return false;
+      // Use startsWith to exclude distributions nested inside any extra_global path
+      if (extraExpandedPaths.some((ep) => d.target_path.startsWith(ep + "/"))) return false;
+      // Exclude distributions already represented by the project-relative source row
+      if (projPath && d.target_path.startsWith(projPath + "/")) return false;
+      return true;
+    });
   }
 
   /** Expand extra_globals for a tool to absolute paths with folder/parent info */

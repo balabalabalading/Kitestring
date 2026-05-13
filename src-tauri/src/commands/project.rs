@@ -16,14 +16,25 @@ pub fn create_project(name: String, path: Option<String>) -> Result<Project, Str
 
     config.projects.push(project.clone());
 
-    // Auto-scan the project folder for skills if a path was provided
-    if !project_path.is_empty() {
-        crate::services::importer::scan_project_folder(&project.id, &project_path, &mut config)?;
-    }
-
+    // Save the project first so import_local_skill can resolve project membership
     crate::models::config::save_config(&config)?;
 
+    if !project_path.is_empty() {
+        // Import skills at the project root (mirrors rescan_project logic)
+        // Ignore error if no SKILL.md is found
+        let _ = crate::services::importer::import_local_skill(&project_path);
+
+        // Reload config after import (import_local_skill saves internally)
+        let mut config = crate::models::config::load_config()?;
+
+        // Scan project tool dirs for symlink/folder entries
+        crate::services::importer::scan_project_folder(&project.id, &project_path, &mut config)?;
+
+        crate::models::config::save_config(&config)?;
+    }
+
     // Return the updated project (skill_ids may have been populated by the scan)
+    let config = crate::models::config::load_config()?;
     let updated = config
         .projects
         .into_iter()
@@ -208,6 +219,47 @@ mod tests {
         let config = crate::models::config::load_config().unwrap();
         let proj = config.projects.iter().find(|p| p.id == proj_id).unwrap();
         assert!(!proj.skill_ids.contains(&skill_id));
+    }
+
+    #[test]
+    fn test_create_project_auto_detects_skills() {
+        let _tmp = setup();
+        let project_dir = tempfile::tempdir().unwrap();
+
+        // Create a skill in the project's .claude/skills/ subdirectory
+        let skill_dir = project_dir.path().join(".claude").join("skills").join("auto-skill");
+        crate::test_helpers::create_skill_md(&skill_dir, "auto-skill", "Auto-detected");
+
+        let project = create_project(
+            "auto-project".to_string(),
+            Some(project_dir.path().to_string_lossy().to_string()),
+        ).unwrap();
+
+        // Project should have the skill in skill_ids immediately after creation
+        assert!(!project.skill_ids.is_empty(), "project should have auto-detected skill_ids");
+
+        let config = crate::models::config::load_config().unwrap();
+        assert_eq!(config.skills.len(), 1, "skill should be imported");
+        assert_eq!(config.skills[0].name, "auto-skill");
+
+        let p = config.projects.iter().find(|p| p.id == project.id).unwrap();
+        assert!(p.skill_ids.contains(&config.skills[0].id));
+    }
+
+    #[test]
+    fn test_create_project_no_skills() {
+        let _tmp = setup();
+        let project_dir = tempfile::tempdir().unwrap();
+
+        // No SKILL.md files — create_project should succeed and return empty skill_ids
+        let project = create_project(
+            "empty-project".to_string(),
+            Some(project_dir.path().to_string_lossy().to_string()),
+        ).unwrap();
+
+        assert!(project.skill_ids.is_empty());
+        let config = crate::models::config::load_config().unwrap();
+        assert!(config.skills.is_empty());
     }
 
     #[test]
