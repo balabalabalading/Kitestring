@@ -519,8 +519,8 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                           if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverGroup(null);
                         }}
                         onDrop={(e) => handleDropOnGroup(e, groupLabel)}
-                        className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded transition-colors ${
-                          isOver ? "bg-accent-sky/10 text-accent-sky" : ""
+                        className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded transition-colors border border-dashed ${
+                          isOver ? "bg-accent-sky-soft text-accent-sky border-accent-sky" : "border-transparent"
                         }`}
                       >
                         {/* Collapse/expand toggle */}

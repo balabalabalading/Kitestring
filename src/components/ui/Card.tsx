@@ -14,7 +14,7 @@ const variantClasses: Record<CardVariant, string> = {
   base: "bg-bg-elevated border-border-subtle hover:border-border-default",
   tool: "bg-bg-elevated border-border-subtle hover:border-border-default relative overflow-hidden",
   "drag-over":
-    "border-2 border-dashed border-accent-sky bg-accent-sky/10 shadow-[var(--shadow-md)] animate-[brand-breathe_2s_ease-in-out_infinite]",
+    "border-2 border-dashed border-accent-sky bg-accent-sky-soft shadow-[var(--shadow-md)] animate-[brand-breathe_2s_ease-in-out_infinite]",
 };
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(

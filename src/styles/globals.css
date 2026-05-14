@@ -192,6 +192,17 @@
   to { transform: translateX(100%); }
 }
 
+/* ─── Focus visible ─── */
+:focus-visible {
+  outline: 2px solid var(--accent-sky);
+  outline-offset: 2px;
+}
+
+/* ─── 拖拽悬停柔和背景 ─── */
+.bg-accent-sky-soft {
+  background: color-mix(in srgb, var(--accent-sky) 10%, transparent);
+}
+
 /* ─── 基础样式 ─── */
 body {
   margin: 0;
