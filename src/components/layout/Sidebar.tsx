@@ -792,12 +792,11 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
           onSkillsCleared?.();
         }}
       />
-      {showCreateProject && (
-        <CreateProjectDialog
-          onCreated={handleProjectCreated}
-          onClose={() => setShowCreateProject(false)}
-        />
-      )}
+      <CreateProjectDialog
+        open={showCreateProject}
+        onCreated={handleProjectCreated}
+        onClose={() => setShowCreateProject(false)}
+      />
     </>
   );
 }
