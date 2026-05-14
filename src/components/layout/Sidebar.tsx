@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useBreakpoint } from "../../hooks/useBreakpoint";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Skill, Project, GitInfo } from "../../types";
 import * as tauri from "../../lib/tauri";
@@ -17,7 +18,7 @@ interface SidebarProps {
   onSelectProject: (project: Project | null) => void;
 }
 
-export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared, selectedProject, onSelectProject }: SidebarProps) {
+export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, selectedProject, onSelectProject: onSelectProjectProp }: SidebarProps) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [gitInfoMap, setGitInfoMap] = useState<Record<string, GitInfo>>({});
@@ -56,6 +57,23 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
   const [pendingConflicts, setPendingConflicts] = useState<tauri.GithubConflict[]>([]);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [currentConflict, setCurrentConflict] = useState<tauri.GithubConflict | null>(null);
+
+  // Responsive state
+  const bp = useBreakpoint();
+  const isNarrow = bp === "narrow";
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  useEffect(() => {
+    if (!isNarrow) setOverlayOpen(false);
+  }, [isNarrow]);
+  // Wrap selection callbacks to close overlay on selection
+  const onSelectSkill = useCallback((s: Skill | null) => {
+    onSelectSkillProp(s);
+    setOverlayOpen(false);
+  }, [onSelectSkillProp]);
+  const onSelectProject = useCallback((p: Project | null) => {
+    onSelectProjectProp(p);
+    setOverlayOpen(false);
+  }, [onSelectProjectProp]);
 
   function openNextConflict(queue: tauri.GithubConflict[]) {
     if (queue.length === 0) {
@@ -297,10 +315,9 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
 
   const hasSkills = skills.length > 0;
 
-  return (
+  const sidebarInner = (
     <>
-      <aside className="w-[var(--sidebar-width)] min-w-[var(--sidebar-width)] border-r border-border-subtle flex flex-col bg-bg-elevated h-full">
-        {/* Brand strip */}
+      {/* Brand strip */}
         <div
           className="h-[var(--brand-strip-height)] w-full shrink-0 animate-[brand-breathe_6s_ease-in-out_infinite]"
           style={{ background: "var(--gradient-skyline)" }}
@@ -589,7 +606,54 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
             </svg>
           </button>
         </div>
-      </aside>
+    </>
+  );
+
+  return (
+    <>
+      {isNarrow ? (
+        <>
+          {/* Collapsed 60px bar */}
+          <aside className="w-[var(--sidebar-collapsed-width)] shrink-0 border-r border-border-subtle flex flex-col items-center py-3 gap-2 bg-bg-elevated h-full">
+            <div className="w-8 h-1 rounded-full animate-[brand-breathe_6s_ease-in-out_infinite]" style={{ background: "var(--gradient-skyline)" }} />
+            <button
+              onClick={() => setOverlayOpen(true)}
+              title="展开侧边栏"
+              className="p-2 rounded-radius-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="mt-auto">
+              <button
+                onClick={() => setShowSettings(true)}
+                title="设置"
+                className="p-2 rounded-radius-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
+          </aside>
+          {/* Backdrop */}
+          <div
+            className={`fixed inset-0 z-30 bg-black/30 transition-opacity ${overlayOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            onClick={() => setOverlayOpen(false)}
+          />
+          {/* Overlay sidebar */}
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[var(--sidebar-width)] bg-bg-elevated border-r border-border-subtle flex flex-col overflow-hidden transition-transform duration-200 ${overlayOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            {sidebarInner}
+          </aside>
+        </>
+      ) : (
+        <aside className="w-[var(--sidebar-width)] min-w-[var(--sidebar-width)] border-r border-border-subtle flex flex-col bg-bg-elevated h-full">
+          {sidebarInner}
+        </aside>
+      )}
 
       {/* Create group dialog */}
       {(() => {

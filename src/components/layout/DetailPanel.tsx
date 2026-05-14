@@ -363,7 +363,7 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
               {distError}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 content-start">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 overflow-y-auto flex-1 content-start">
             {TOOLS.map((tool) => {
               const globalDist = getGlobalDist(tool);
               const customDists = getCustomDists(tool);
@@ -502,8 +502,8 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
           </div>
         </div>
 
-        {/* File Tree — 1/4 */}
-        <div className="flex-[1] flex flex-col min-w-0 min-h-0 max-w-xs">
+        {/* File Tree — 1/4, hidden at narrow (<lg) */}
+        <div className="hidden lg:flex lg:flex-[1] flex-col min-w-0 min-h-0 max-w-xs">
           <h3 className="text-sm font-medium text-text-primary mb-3 shrink-0">文件结构</h3>
           <div className="border border-border-subtle rounded-radius-lg overflow-hidden flex flex-1 min-h-0 bg-bg-elevated">
             {files.length > 0 ? (
