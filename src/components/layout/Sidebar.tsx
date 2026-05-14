@@ -784,15 +784,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
         )}
       </Dialog>
 
-      {showSettings && (
-        <SettingsPanel
-          onClose={() => setShowSettings(false)}
-          onSkillsCleared={() => {
-            setShowSettings(false);
-            onSkillsCleared?.();
-          }}
-        />
-      )}
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSkillsCleared={() => {
+          setShowSettings(false);
+          onSkillsCleared?.();
+        }}
+      />
       {showCreateProject && (
         <CreateProjectDialog
           onCreated={handleProjectCreated}
