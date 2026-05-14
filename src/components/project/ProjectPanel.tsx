@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import type { Project, Skill, Distribution, AppConfig } from "../../types";
 import { TOOL_DISPLAY_NAMES } from "../../types";
 import * as tauri from "../../lib/tauri";
+import { Dialog } from "../ui/Dialog";
+import { Button } from "../ui/Button";
+import { Input } from "../ui/Input";
+import DistributionMatrix from "./DistributionMatrix";
 
 type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
 const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
@@ -22,8 +26,6 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [redetecting, setRedetecting] = useState(false);
   const [distError, setDistError] = useState<string | null>(null);
-  const [dragOverTool, setDragOverTool] = useState<Tool | null>(null);
-  const [dropErrors, setDropErrors] = useState<Record<string, string>>({});
   // Add Skill modal
   const [showAddSkill, setShowAddSkill] = useState(false);
   const [addSearch, setAddSearch] = useState("");
@@ -92,12 +94,6 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     });
   }
 
-  const statusColor: Record<string, string> = {
-    Linked: "bg-green-400",
-    Broken: "bg-red-400",
-    Pending: "bg-yellow-400",
-  };
-
   async function handleRedetect() {
     if (!project.path || redetecting) return;
     setRedetecting(true);
@@ -112,20 +108,28 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     }
   }
 
-  async function handleDropSkill(skillId: string, tool: Tool) {
+  async function handleDistribute(skillId: string, tool: Tool) {
     const toolPath = getToolProjectPath(tool);
     if (!toolPath) {
-      setDropErrors((prev) => ({ ...prev, [tool]: "未配置工具项目路径" }));
+      setDistError("未配置工具项目路径");
       return;
     }
-    setDropErrors((prev) => ({ ...prev, [tool]: "" }));
+    setDistError(null);
     try {
       await tauri.distributeToDir(skillId, tool, toolPath);
       await reload();
     } catch (e) {
-      setDropErrors((prev) => ({ ...prev, [tool]: String(e) }));
-    } finally {
-      setDragOverTool(null);
+      setDistError(String(e));
+    }
+  }
+
+  async function handleRemoveDist(distId: string) {
+    setDistError(null);
+    try {
+      await tauri.removeDistribution(distId);
+      await reload();
+    } catch (e) {
+      setDistError(String(e));
     }
   }
 
@@ -171,131 +175,70 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     (s.description ?? "").toLowerCase().includes(addSearch.toLowerCase())
   );
 
+  const distributedToolsCount = TOOLS.filter((t) => skillsInToolPath(t).length > 0).length;
+
   return (
     <main className="flex-1 flex flex-col p-8 min-h-0 overflow-y-auto">
       {/* Header */}
       <div className="mb-6 shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">{folderName}</h2>
+          <h2 className="text-xl font-semibold text-text-primary">{folderName}</h2>
           {project.path && (
-            <button
-              onClick={handleRedetect}
-              disabled={redetecting}
-              className="text-xs px-2.5 py-1 rounded-md border border-gray-200 text-[#424245] hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
+            <Button variant="secondary" size="sm" onClick={handleRedetect} disabled={redetecting}>
               {redetecting ? "检测中..." : "重新检测"}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => { setShowAddSkill(true); setAddSelectedSkillId(null); setAddSearch(""); }}
-            className="text-xs px-2.5 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
           >
             添加 Skill
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="text-xs px-2.5 py-1 rounded-md border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
-          >
+          </Button>
+          <Button variant="ghost" size="sm" className="!text-status-broken" onClick={() => setShowDeleteConfirm(true)}>
             删除项目
-          </button>
+          </Button>
         </div>
         {project.path && (
-          <p className="text-xs text-[#86868b] font-mono mt-0.5">{project.path}</p>
+          <p className="text-xs text-text-tertiary font-mono mt-0.5">{project.path}</p>
         )}
+        <p className="text-xs text-text-tertiary mt-1">
+          {detectedSkills.length} 个技能 · {distributedToolsCount} 个工具已分发
+        </p>
         {distError && (
-          <p className="mt-2 text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded-md">{distError}</p>
+          <p
+            className="mt-2 text-xs text-status-broken px-3 py-1.5 rounded-radius-md"
+            style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}
+          >
+            {distError}
+          </p>
         )}
       </div>
 
-      {/* Distribution status — per-tool project paths */}
+      {/* Distribution matrix */}
       {project.path && (
         <div className="mb-6 shrink-0">
-          <h3 className="text-sm font-medium text-[#1d1d1f] mb-3">分发状态</h3>
-          <p className="text-[10px] text-[#86868b] mb-2">可从左侧导航拖拽 Skill 到工具卡片中分发</p>
-          <div className="grid grid-cols-2 gap-3">
-            {TOOLS.map((tool) => {
-              const toolPath = getToolProjectPath(tool);
-              const toolSkills = skillsInToolPath(tool);
-              const toolPathParts = toolPath.split("/");
-              const toolFolderName = toolPathParts[toolPathParts.length - 1] ?? "";
-              const toolParentPath = toolPathParts.slice(0, -1).join("/") + "/";
-              const isDragOver = dragOverTool === tool;
-
-              return (
-                <div
-                  key={tool}
-                  className={`relative border rounded-lg bg-white overflow-hidden transition-all ${
-                    isDragOver ? "border-blue-400 shadow-md" : "border-gray-200"
-                  }`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "copy";
-                    if (dragOverTool !== tool) setDragOverTool(tool);
-                  }}
-                  onDragEnter={(e) => { e.preventDefault(); setDragOverTool(tool); }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                      setDragOverTool(null);
-                    }
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const skillId = e.dataTransfer.getData("skill-id") || (window as unknown as Record<string, string>)["__draggedSkillId"];
-                    setDragOverTool(null);
-                    if (skillId) handleDropSkill(skillId, tool);
-                  }}
-                >
-                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-                    <div className="text-xs font-medium text-[#1d1d1f]">{TOOL_DISPLAY_NAMES[tool]}</div>
-                    {toolPath && (
-                      <div className="flex flex-col mt-0.5">
-                        <span className="text-[10px] text-[#1d1d1f] font-mono truncate">{toolFolderName}</span>
-                        <span className="text-[10px] text-[#86868b] font-mono truncate" title={toolParentPath}>{toolParentPath}</span>
-                      </div>
-                    )}
-                  </div>
-                  {toolSkills.length === 0 ? (
-                    <div className="px-3 py-3 text-[11px] text-[#86868b]">暂无</div>
-                  ) : (
-                    toolSkills.map(({ skill, dist, isSymlink }) => (
-                      <button
-                        key={skill.id}
-                        onClick={() => onSelectSkill(skill)}
-                        className="w-full px-3 py-2 flex items-center gap-2 border-t border-gray-100 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor[dist.status] ?? "bg-gray-300"}`} />
-                        <span className="text-xs text-[#1d1d1f] truncate flex-1">{skill.name}</span>
-                        <span className={`text-[9px] px-1 py-0.5 rounded leading-none shrink-0 ${isSymlink ? "bg-blue-50 text-blue-500" : "bg-gray-100 text-[#86868b]"}`}>
-                          {isSymlink ? "symlink" : "文件夹"}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                  {dropErrors[tool] && (
-                    <div className="px-3 py-1.5 text-[10px] text-red-500 border-t border-gray-100">{dropErrors[tool]}</div>
-                  )}
-                  {/* Drag overlay */}
-                  {isDragOver && (
-                    <div className="absolute inset-0 bg-blue-50/80 flex items-center justify-center pointer-events-none">
-                      <span className="text-[11px] text-blue-600 font-medium">松开以分发</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <h3 className="text-sm font-medium text-text-primary mb-3">分发状态</h3>
+          <DistributionMatrix
+            skills={detectedSkills}
+            tools={TOOLS}
+            allDists={allDists}
+            getToolProjectPath={getToolProjectPath}
+            onDistribute={handleDistribute}
+            onRemoveDist={handleRemoveDist}
+          />
         </div>
       )}
 
       {/* Skills list */}
       <div className="mb-6 shrink-0">
-        <h3 className="text-sm font-medium text-[#1d1d1f] mb-3">
+        <h3 className="text-sm font-medium text-text-primary mb-3">
           项目中的 Skills
-          <span className="ml-2 text-xs font-normal text-[#86868b]">({detectedSkills.length})</span>
+          <span className="ml-2 text-xs font-normal text-text-tertiary">({detectedSkills.length})</span>
         </h3>
 
         {detectedSkills.length === 0 ? (
-          <div className="text-sm text-[#86868b] py-2">
+          <div className="text-sm text-text-tertiary py-2">
             {projectPath ? "暂未在此文件夹下检测到 Skill" : "暂无 Skill"}
           </div>
         ) : (
@@ -304,13 +247,13 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
               <button
                 key={skill.id}
                 onClick={() => onSelectSkill(skill)}
-                className="w-full text-left border border-gray-200 rounded-lg bg-white hover:border-blue-200 hover:shadow-sm transition-all px-4 py-3"
+                className="w-full text-left border border-border-subtle rounded-radius-lg bg-bg-surface hover:border-accent-sky/40 hover:shadow-sm transition-all px-4 py-3"
               >
-                <div className="text-sm font-medium text-[#1d1d1f] truncate">{skill.name}</div>
+                <div className="text-sm font-medium text-text-primary truncate">{skill.name}</div>
                 {skill.description && (
-                  <div className="text-xs text-[#86868b] mt-0.5 line-clamp-2">{skill.description}</div>
+                  <div className="text-xs text-text-tertiary mt-0.5 line-clamp-2">{skill.description}</div>
                 )}
-                <div className="text-[10px] text-[#86868b] font-mono mt-1 truncate" title={skill.source_path}>
+                <div className="text-[10px] text-text-tertiary font-mono mt-1 truncate" title={skill.source_path}>
                   {skill.source_path}
                 </div>
               </button>
@@ -319,120 +262,112 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
         )}
       </div>
 
-      {/* Add Skill modal */}
-      {showAddSkill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-[480px] max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">添加 Skill 到项目</h3>
-              <button onClick={() => setShowAddSkill(false)} className="text-[#86868b] hover:text-[#1d1d1f] text-lg leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100">×</button>
-            </div>
-            <div className="flex flex-col gap-4 px-5 py-4 flex-1 overflow-hidden min-h-0">
-              {/* Skill picker */}
-              <div className="flex flex-col min-h-0">
-                <label className="text-xs font-medium text-[#1d1d1f] mb-1.5">选择 Skill</label>
-                <input
-                  type="text"
-                  value={addSearch}
-                  onChange={(e) => setAddSearch(e.target.value)}
-                  placeholder="搜索..."
-                  className="text-xs px-2.5 py-1.5 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400 mb-2"
-                  autoFocus
-                />
-                <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md min-h-[120px] max-h-[220px]">
-                  {filteredAddSkills.length === 0 ? (
-                    <div className="p-3 text-xs text-[#86868b]">无匹配 Skill</div>
-                  ) : (
-                    filteredAddSkills.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setAddSelectedSkillId(s.id === addSelectedSkillId ? null : s.id)}
-                        className={`w-full text-left px-3 py-2 border-b border-gray-100 last:border-b-0 transition-colors ${
-                          addSelectedSkillId === s.id
-                            ? "bg-blue-50 border-blue-100"
-                            : "hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="text-xs font-medium text-[#1d1d1f]">{s.name}</div>
-                        {s.description && (
-                          <div className="text-[10px] text-[#86868b] truncate">{s.description}</div>
-                        )}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-              {/* Tool selector */}
-              <div>
-                <label className="text-xs font-medium text-[#1d1d1f] mb-1.5 block">分发到工具路径</label>
-                <div className="flex flex-wrap gap-2">
-                  {TOOLS.map((tool) => (
-                    <label key={tool} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={addSelectedTools.has(tool)}
-                        onChange={(e) => {
-                          const next = new Set(addSelectedTools);
-                          if (e.target.checked) next.add(tool);
-                          else next.delete(tool);
-                          setAddSelectedTools(next);
-                        }}
-                        className="rounded"
-                      />
-                      <span>{TOOL_DISPLAY_NAMES[tool]}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
-              <button
-                onClick={() => setShowAddSkill(false)}
-                className="text-xs px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAddSkill}
-                disabled={!addSelectedSkillId || addSelectedTools.size === 0 || addLoading}
-                className="text-xs px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245] disabled:opacity-40"
-              >
-                {addLoading ? "分发中..." : "分发"}
-              </button>
+      {/* Add Skill dialog */}
+      <Dialog open={showAddSkill} onClose={() => setShowAddSkill(false)} width="w-[480px]">
+        <div className="p-5 flex flex-col gap-4 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-text-primary shrink-0">添加 Skill 到项目</h3>
+
+          {/* Skill picker */}
+          <div className="flex flex-col min-h-0">
+            <label className="text-xs font-medium text-text-primary mb-1.5">选择 Skill</label>
+            <Input
+              value={addSearch}
+              onChange={(e) => setAddSearch(e.target.value)}
+              placeholder="搜索..."
+              autoFocus
+              className="mb-2"
+            />
+            <div className="overflow-y-auto border border-border-subtle rounded-radius-md min-h-[120px] max-h-[200px]">
+              {filteredAddSkills.length === 0 ? (
+                <div className="p-3 text-xs text-text-tertiary">无匹配 Skill</div>
+              ) : (
+                filteredAddSkills.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setAddSelectedSkillId(s.id === addSelectedSkillId ? null : s.id)}
+                    className={`w-full text-left px-3 py-2 border-b border-border-subtle last:border-b-0 transition-colors ${
+                      addSelectedSkillId === s.id
+                        ? "bg-bg-elevated"
+                        : "hover:bg-bg-surface"
+                    }`}
+                  >
+                    <div className="text-xs font-medium text-text-primary">{s.name}</div>
+                    {s.description && (
+                      <div className="text-[10px] text-text-tertiary truncate">{s.description}</div>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           </div>
+
+          {/* Tool selector */}
+          <div>
+            <label className="text-xs font-medium text-text-primary mb-1.5 block">分发到工具路径</label>
+            <div className="flex flex-wrap gap-3">
+              {TOOLS.map((tool) => (
+                <label key={tool} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={addSelectedTools.has(tool)}
+                    onChange={(e) => {
+                      const next = new Set(addSelectedTools);
+                      if (e.target.checked) next.add(tool);
+                      else next.delete(tool);
+                      setAddSelectedTools(next);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-text-secondary">{TOOL_DISPLAY_NAMES[tool]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 shrink-0">
+            <Button variant="secondary" size="sm" onClick={() => setShowAddSkill(false)}>取消</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAddSkill}
+              disabled={!addSelectedSkillId || addSelectedTools.size === 0 || addLoading}
+            >
+              {addLoading ? "分发中..." : "分发"}
+            </Button>
+          </div>
         </div>
-      )}
+      </Dialog>
 
       {/* Delete confirmation dialog */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-80 flex flex-col gap-4">
-            <h3 className="text-base font-semibold text-[#1d1d1f]">删除项目</h3>
-            <p className="text-sm text-[#424245]">
-              确认删除项目「{project.name}」？<br />
-              <span className="text-[#86868b]">不会删除本地文件夹，仅从 Kitestring 中移除记录。</span>
-            </p>
-            {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
-                disabled={deleting}
-                className="px-3 py-1.5 text-sm rounded-md border border-gray-200 text-[#424245] hover:bg-gray-50 disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleDeleteProject}
-                disabled={deleting}
-                className="px-3 py-1.5 text-sm rounded-md bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
-              >
-                {deleting ? "删除中…" : "确认删除"}
-              </button>
-            </div>
+      <Dialog open={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteError(null); }}>
+        <div className="p-5 flex flex-col gap-4">
+          <h3 className="text-base font-semibold text-text-primary">删除项目</h3>
+          <p className="text-sm text-text-secondary">
+            确认删除项目「{project.name}」？<br />
+            <span className="text-text-tertiary">不会删除本地文件夹，仅从 Kitestring 中移除记录。</span>
+          </p>
+          {deleteError && <p className="text-xs text-status-broken">{deleteError}</p>}
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
+              disabled={deleting}
+            >
+              取消
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="!text-status-broken"
+              onClick={handleDeleteProject}
+              disabled={deleting}
+            >
+              {deleting ? "删除中…" : "确认删除"}
+            </Button>
           </div>
         </div>
-      )}
+      </Dialog>
     </main>
   );
 }
