@@ -3,8 +3,11 @@ import Sidebar from "./components/layout/Sidebar";
 import DetailPanel from "./components/layout/DetailPanel";
 import ProjectPanel from "./components/project/ProjectPanel";
 import type { Skill, Project } from "./types";
+import { useTheme } from "./hooks/useTheme";
+import { ToastProvider } from "./components/ui/Toast";
 
 function App() {
+  useTheme();
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -44,7 +47,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <ToastProvider>
       <Sidebar
         key={refreshKey}
         selectedSkill={selectedSkill}
@@ -62,7 +65,7 @@ function App() {
           onSkillPulled={handleSkillPulled}
         />
       )}
-    </>
+    </ToastProvider>
   );
 }
 
