@@ -14,7 +14,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           "bg-bg-elevated border border-border-subtle",
           "text-text-primary placeholder:text-text-tertiary",
           "transition-[border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
-          "focus:outline-none focus:border-border-accent focus:ring-[3px] focus:ring-border-accent/15",
+          "focus-visible:outline-none focus-visible:border-border-accent focus-visible:ring-[3px] focus-visible:ring-border-accent/15",
           "disabled:opacity-40 disabled:pointer-events-none",
           mono ? "font-mono" : "font-sans",
           className,

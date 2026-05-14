@@ -28,7 +28,7 @@ export default function FileViewer({ skillSourcePath, relativePath }: FileViewer
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-xs text-[#86868b]">
+      <div className="flex-1 flex items-center justify-center text-xs text-text-tertiary">
         加载中...
       </div>
     );
@@ -36,7 +36,7 @@ export default function FileViewer({ skillSourcePath, relativePath }: FileViewer
 
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center text-xs text-red-400">
+      <div className="flex-1 flex items-center justify-center text-xs text-status-broken">
         {error}
       </div>
     );
@@ -44,10 +44,10 @@ export default function FileViewer({ skillSourcePath, relativePath }: FileViewer
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="px-1 py-0.5 text-xs text-[#86868b] border-b border-gray-100 mb-1">
+      <div className="px-1 py-0.5 text-xs text-text-tertiary border-b border-border-subtle mb-1">
         {relativePath}
       </div>
-      <pre className="text-xs font-mono text-[#1d1d1f] whitespace-pre-wrap break-words p-2 leading-relaxed">
+      <pre className="text-xs font-mono text-text-primary whitespace-pre-wrap break-words p-2 leading-relaxed">
         {content}
       </pre>
     </div>
