@@ -218,7 +218,9 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       {/* Distribution matrix */}
       {project.path && (
         <div className="mb-6 shrink-0">
-          <h3 className="text-sm font-medium text-text-primary mb-3">分发状态</h3>
+          <h3 className="font-normal text-text-primary mb-3"
+            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)" }}
+          >分发状态</h3>
           <DistributionMatrix
             skills={detectedSkills}
             tools={TOOLS}

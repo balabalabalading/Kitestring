@@ -11,6 +11,11 @@ function App() {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [skillsCount, setSkillsCount] = useState(0);
+
+  const handleSkillsLoaded = useCallback((count: number) => {
+    setSkillsCount(count);
+  }, []);
 
   const handleSelectSkill = useCallback((skill: Skill | null) => {
     setSelectedSkill(skill);
@@ -53,6 +58,7 @@ function App() {
         selectedSkill={selectedSkill}
         onSelectSkill={handleSelectSkill}
         onSkillsCleared={handleSkillsCleared}
+        onSkillsLoaded={handleSkillsLoaded}
         selectedProject={selectedProject}
         onSelectProject={handleSelectProject}
       />
@@ -61,6 +67,7 @@ function App() {
       ) : (
         <DetailPanel
           skill={selectedSkill}
+          totalSkillsCount={skillsCount}
           onSkillDeleted={handleSkillDeleted}
           onSkillPulled={handleSkillPulled}
         />

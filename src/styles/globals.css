@@ -7,6 +7,7 @@
   --color-bg-base: var(--bg-base);
   --color-bg-elevated: var(--bg-elevated);
   --color-bg-surface: var(--bg-surface);
+  --color-bg-hover: var(--bg-hover);
   --color-border-subtle: var(--border-subtle);
   --color-border-default: var(--border-default);
   --color-border-accent: var(--border-accent);
@@ -43,8 +44,17 @@
   --radius-xl: 16px;
   --radius-full: 9999px;
 
+  /* 字号层级 */
+  --font-size-h1: 24px;
+  --font-size-h2: 18px;
+  --font-size-h3: 14px;
+  --font-size-body: 13px;
+  --font-size-caption: 11px;
+  --font-size-micro: 10px;
+
   /* 布局 */
   --sidebar-width: 240px;
+  --sidebar-width-wide: 260px;
   --sidebar-collapsed-width: 60px;
   --drawer-width: 360px;
   --brand-strip-height: 3px;
@@ -56,6 +66,7 @@
   --bg-base: #FFFFFF;
   --bg-elevated: #F5F5F0;
   --bg-surface: #EEEEEA;
+  --bg-hover: #E8E8E3;
   --border-subtle: #E5E5E0;
   --border-default: #D4D4CC;
   --border-accent: #2B8CC4;
@@ -81,6 +92,7 @@
   --bg-base: #12151D;
   --bg-elevated: #1A1D28;
   --bg-surface: #222536;
+  --bg-hover: #2D3048;
   --border-subtle: #1E2130;
   --border-default: #2A2D40;
   --border-accent: #3BA5D9;
@@ -104,6 +116,7 @@
 :root {
   --gradient-skyline: linear-gradient(135deg, var(--accent-sky) 0%, var(--accent-warm) 100%);
   --gradient-void: radial-gradient(ellipse at 50% 0%, var(--bg-elevated) 0%, var(--bg-deep) 70%);
+  --gradient-thread: linear-gradient(90deg, var(--accent-sky) 0%, var(--accent-warm) 100%);
 }
 
 /* ─── 动效变量 ─── */
@@ -192,6 +205,24 @@
   to { transform: translateX(100%); }
 }
 
+/* 面板切换淡入+上移 */
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 拖拽中技能项呼吸动画 */
+@keyframes drag-breathe {
+  0%, 100% { transform: scale(1.0); }
+  50%       { transform: scale(1.02); }
+}
+
+/* 分发涟漪 */
+@keyframes ripple-burst {
+  from { transform: scale(0); opacity: 0.45; }
+  to   { transform: scale(2.5); opacity: 0; }
+}
+
 /* ─── Focus visible ─── */
 :focus-visible {
   outline: 2px solid var(--accent-sky);
@@ -211,6 +242,35 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-deep);
   color: var(--text-primary);
+  /* 中文排版：汉字行高 1.6 */
+  line-height: 1.6;
+}
+
+/* 纯英文/数字区域可局部还原 1.5 */
+:lang(en) {
+  line-height: 1.5;
+}
+
+/* 分发按钮涟漪工具类 */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, transparent 65%);
+  opacity: 0;
+  border-radius: 50%;
+  transform: scale(0.2);
+  pointer-events: none;
+  transition: opacity 300ms var(--ease-out), transform 400ms var(--ease-out);
+}
+.btn-ripple:active::after {
+  opacity: 1;
+  transform: scale(1);
+  transition: none;
 }
 
 #root {

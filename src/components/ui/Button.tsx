@@ -10,7 +10,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-accent-warm text-text-inverse hover:brightness-110 active:translate-y-[1px]",
+    "btn-ripple bg-accent-warm text-text-inverse hover:brightness-110 active:translate-y-[1px]",
   secondary:
     "border border-border-default text-text-secondary hover:bg-bg-elevated active:translate-y-[1px]",
   ghost:

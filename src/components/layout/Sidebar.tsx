@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
+import { useTheme } from "../../hooks/useTheme";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Skill, Project, GitInfo } from "../../types";
 import * as tauri from "../../lib/tauri";
@@ -14,11 +15,12 @@ interface SidebarProps {
   selectedSkill: Skill | null;
   onSelectSkill: (skill: Skill | null) => void;
   onSkillsCleared?: () => void;
+  onSkillsLoaded?: (count: number) => void;
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
 }
 
-export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, selectedProject, onSelectProject: onSelectProjectProp }: SidebarProps) {
+export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp }: SidebarProps) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [gitInfoMap, setGitInfoMap] = useState<Record<string, GitInfo>>({});
@@ -65,6 +67,8 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   useEffect(() => {
     if (!isNarrow) setOverlayOpen(false);
   }, [isNarrow]);
+  // Theme
+  const { mode, setMode } = useTheme();
   // Wrap selection callbacks to close overlay on selection
   const onSelectSkill = useCallback((s: Skill | null) => {
     onSelectSkillProp(s);
@@ -147,6 +151,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       setSkills(skillList);
       setProjects(projectList);
       setServerGroups(groupList);
+      onSkillsLoaded?.(skillList.length);
       const gitResults = await Promise.allSettled(
         skillList.map((s) => tauri.getGitInfo(s.source_path))
       );
@@ -584,8 +589,9 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               </div>
             )}
             {!skillsCollapsed && hasSkills && filteredSkills.length === 0 && query && (
-              <div className="px-5 py-2 text-xs text-text-tertiary">
-                没有匹配「{query}」的 Skill
+              <div className="px-5 py-3 text-xs text-text-tertiary leading-relaxed">
+                <div>没有匹配的结果</div>
+                <div className="text-[10px] mt-0.5">尝试更换关键词</div>
               </div>
             )}
           </div>
@@ -594,17 +600,37 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         {/* Footer */}
         <div className="px-4 py-2 border-t border-border-subtle flex items-center justify-between">
           <span className="text-xs text-text-tertiary">v0.1.0</span>
-          <button
-            onClick={() => setShowSettings(true)}
-            title="设置"
-            className="w-6 h-6 rounded-radius-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {/* 主题快捷切换 */}
+            <button
+              onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+              title={mode === "dark" ? "切换到亮色模式" : "切换到暗色模式"}
+              className="w-6 h-6 rounded-radius-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+            >
+              {mode === "dark" ? (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              title="设置"
+              className="w-6 h-6 rounded-radius-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
         </div>
     </>
   );
@@ -625,7 +651,25 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="mt-auto">
+            <div className="mt-auto flex flex-col gap-1">
+              {/* 主题快捷切换 */}
+              <button
+                onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+                title={mode === "dark" ? "切换到亮色" : "切换到暗色"}
+                className="p-2 rounded-radius-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+              >
+                {mode === "dark" ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
               <button
                 onClick={() => setShowSettings(true)}
                 title="设置"
@@ -650,7 +694,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           </aside>
         </>
       ) : (
-        <aside className="w-[var(--sidebar-width)] min-w-[var(--sidebar-width)] border-r border-border-subtle flex flex-col bg-bg-elevated h-full">
+        <aside
+          style={{ width: bp === "wide" ? "var(--sidebar-width-wide)" : "var(--sidebar-width)" }}
+          className="min-w-0 border-r border-border-subtle flex flex-col bg-bg-elevated h-full"
+        >
           {sidebarInner}
         </aside>
       )}
@@ -894,23 +941,26 @@ function SkillItem({
   gitInfo?: GitInfo;
   indent?: boolean;
 }) {
+  const [isDragging, setIsDragging] = useState(false);
   const repoName = getRepoName(skill, gitInfo);
   return (
     <button
       onClick={onSelect}
       draggable
       onDragStart={(e) => {
+        setIsDragging(true);
         e.dataTransfer.setData("skill-id", skill.id);
         e.dataTransfer.effectAllowed = "copy";
         (window as unknown as Record<string, string>)["__draggedSkillId"] = skill.id;
       }}
+      onDragEnd={() => setIsDragging(false)}
       className={`relative w-full text-left py-1.5 text-sm transition-colors flex flex-col ${
         indent ? "px-7" : "px-5"
       } ${
         selected
           ? "bg-bg-base text-text-primary font-medium before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-accent-warm before:rounded-r-full"
           : "text-text-secondary hover:bg-bg-elevated/60"
-      }`}
+      } ${isDragging ? "animate-[drag-breathe_1.5s_ease-in-out_infinite]" : ""}`}
     >
       <div className="flex items-center justify-between w-full gap-1">
         <span className="truncate flex-1 text-xs">{skill.name}</span>

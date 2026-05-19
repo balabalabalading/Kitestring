@@ -12,13 +12,14 @@ import { useToast } from "../ui/Toast";
 
 interface DetailPanelProps {
   skill: Skill | null;
+  totalSkillsCount: number;
   onSkillDeleted: (id: string) => void;
   onSkillPulled: () => void;
 }
 
 const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
 
-export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: DetailPanelProps) {
+export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, onSkillPulled }: DetailPanelProps) {
   const [distributions, setDistributions] = useState<Distribution[]>([]);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [files, setFiles] = useState<tauri.FileNode[]>([]);
@@ -98,6 +99,37 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
   }
 
   if (!skill) {
+    // 首次启动：没有任何 Skill
+    if (totalSkillsCount === 0) {
+      return (
+        <main className="flex-1 flex flex-col items-center justify-center gap-5 text-text-tertiary px-8">
+          <svg
+            width="64" height="64" viewBox="0 0 56 56" fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="animate-[kite-float_4s_ease-in-out_infinite] opacity-80"
+            style={{ color: "var(--accent-warm)" }}
+          >
+            <path d="M28 4 L50 28 L28 48 L6 28 Z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+            <line x1="6" y1="28" x2="50" y2="28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+            <line x1="28" y1="4" x2="28" y2="48" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+            <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+          </svg>
+          <div className="text-center">
+            <p style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)", color: "var(--text-primary)" }} className="mb-2">
+              开始编织你的 AI 技能网络
+            </p>
+            <p className="text-sm text-text-tertiary leading-relaxed">
+              从本地文件夹或 GitHub 仓库导入你的第一个 Skill
+            </p>
+          </div>
+          <div className="flex gap-3 mt-1 text-xs text-text-tertiary">
+            <span className="px-2.5 py-1 rounded-radius-md border border-border-subtle bg-bg-elevated">📁 本地文件夹</span>
+            <span className="px-2.5 py-1 rounded-radius-md border border-border-subtle bg-bg-elevated">🐙 GitHub 仓库</span>
+          </div>
+        </main>
+      );
+    }
+    // 有 Skill 但未选中
     return (
       <main className="flex-1 flex flex-col items-center justify-center gap-4 text-text-tertiary">
         <svg
@@ -309,14 +341,14 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
         </div>
       </Dialog>
 
-    <main className="flex-1 flex flex-col p-4 min-h-0 overflow-y-auto gap-4">
+    <main key={skill.id} className="flex-1 flex flex-col p-4 min-h-0 overflow-y-auto gap-4 animate-[panel-enter_200ms_var(--ease-out)_both]">
 
       {/* Identity Card */}
       <Card variant="base" className="p-4 shrink-0">
         <div className="flex items-center flex-wrap gap-2 mb-1">
           <h2
             className="text-text-primary font-normal leading-tight"
-            style={{ fontFamily: "var(--font-serif)", fontSize: "22px" }}
+            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h1)" }}
           >
             {skill.name}
           </h2>
@@ -357,7 +389,9 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Distribution Status — 3/4 */}
         <div className="flex-[3] flex flex-col min-w-0 min-h-0">
-          <h3 className="text-sm font-medium text-text-primary mb-3 shrink-0">分发状态</h3>
+          <h3 className="text-sm font-medium text-text-primary mb-3 shrink-0"
+            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)", fontWeight: 400 }}
+          >分发状态</h3>
           {distError && (
             <div className="mb-2 text-xs px-2 py-1.5 rounded-radius-md shrink-0" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>
               {distError}
@@ -405,9 +439,9 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                     {isFileSource(tool) ? (
                       <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">文件来源</span>
                     ) : globalDist ? (
-                      <button onClick={() => handleRemoveDist(globalDist.id)} className="text-[10px] text-text-tertiary hover:text-status-broken shrink-0">取消</button>
+                      <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                     ) : (
-                      <button onClick={() => handleDistribute(tool, "Global")} className="text-[10px] text-accent-sky hover:text-accent-sky/80 font-medium shrink-0">分发</button>
+                      <Button variant="primary" size="sm" onClick={() => handleDistribute(tool, "Global")} className="shrink-0">分发</Button>
                     )}
                   </div>
 
@@ -428,9 +462,9 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                         {egIsFileSource ? (
                           <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">文件来源</span>
                         ) : egDist ? (
-                          <button onClick={() => handleRemoveDist(egDist.id)} className="text-[10px] text-text-tertiary hover:text-status-broken shrink-0">取消</button>
+                          <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                         ) : (
-                          <button onClick={() => handleDistributeToDir(tool, eg.path)} className="text-[10px] text-accent-sky hover:text-accent-sky/80 font-medium shrink-0">分发</button>
+                          <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, eg.path)} className="shrink-0">分发</Button>
                         )}
                       </div>
                     );
@@ -471,7 +505,7 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                             {grandparentPath}
                           </div>
                         </div>
-                        <button onClick={() => handleRemoveDist(dist.id)} className="text-[10px] text-text-tertiary hover:text-status-broken shrink-0">取消</button>
+                        <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(dist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                       </div>
                     );
                   })}
@@ -504,7 +538,9 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
 
         {/* File Tree — 1/4, hidden at narrow (<lg) */}
         <div className="hidden lg:flex lg:flex-[1] flex-col min-w-0 min-h-0 max-w-xs">
-          <h3 className="text-sm font-medium text-text-primary mb-3 shrink-0">文件结构</h3>
+          <h3 className="text-sm font-medium text-text-primary mb-3 shrink-0"
+            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)", fontWeight: 400 }}
+          >文件结构</h3>
           <div className="border border-border-subtle rounded-radius-lg overflow-hidden flex flex-1 min-h-0 bg-bg-elevated">
             {files.length > 0 ? (
               <div className="overflow-y-auto py-1 w-full">
