@@ -123,8 +123,8 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             </p>
           </div>
           <div className="flex gap-3 mt-1 text-xs text-text-tertiary">
-            <span className="px-2.5 py-1 rounded-radius-md border border-border-subtle bg-bg-elevated">📁 本地文件夹</span>
-            <span className="px-2.5 py-1 rounded-radius-md border border-border-subtle bg-bg-elevated">🐙 GitHub 仓库</span>
+            <span className="px-2.5 py-1 rounded-md border border-border-subtle bg-bg-elevated">📁 本地文件夹</span>
+            <span className="px-2.5 py-1 rounded-md border border-border-subtle bg-bg-elevated">🐙 GitHub 仓库</span>
           </div>
         </main>
       );
@@ -305,7 +305,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             不会删除本地文件夹。
           </p>
           {actionError && (
-            <div className="mb-3 text-xs px-3 py-1.5 rounded-radius-md" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>{actionError}</div>
+            <div className="mb-3 text-xs px-3 py-1.5 rounded-md" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>{actionError}</div>
           )}
           <div className="flex flex-col gap-2">
             {distributions.filter((d) => d.entry_type === "Symlink").length > 0 && (
@@ -393,7 +393,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)", fontWeight: 400 }}
           >分发状态</h3>
           {distError && (
-            <div className="mb-2 text-xs px-2 py-1.5 rounded-radius-md shrink-0" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>
+            <div className="mb-2 text-xs px-2 py-1.5 rounded-md shrink-0" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>
               {distError}
             </div>
           )}
@@ -429,7 +429,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                   {/* Global path row (always shown) */}
                   <div className="px-3 py-2 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(globalDist?.status ?? "none")} />
-                    <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">用户级</span>
+                    <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">用户级</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-text-primary font-medium truncate">{globalFolderName}</div>
                       <div className="text-[10px] text-text-tertiary font-mono truncate" title={globalGrandparentPath}>
@@ -437,7 +437,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                       </div>
                     </div>
                     {isFileSource(tool) ? (
-                      <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">文件来源</span>
+                      <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-sm border border-border-subtle shrink-0">文件来源</span>
                     ) : globalDist ? (
                       <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                     ) : (
@@ -452,7 +452,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div key={eg.path} className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border-subtle">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(egIsFileSource ? "Linked" : egDist?.status ?? "none")} />
-                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">用户级</span>
+                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">用户级</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-text-primary font-medium truncate">{eg.folderName}/*/skills</div>
                           <div className="text-[10px] text-text-tertiary font-mono truncate" title={eg.parentPath}>
@@ -460,7 +460,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                           </div>
                         </div>
                         {egIsFileSource ? (
-                          <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">文件来源</span>
+                          <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-sm border border-border-subtle shrink-0">文件来源</span>
                         ) : egDist ? (
                           <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                         ) : (
@@ -478,14 +478,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border-subtle">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "var(--status-linked)" }} />
-                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">项目级</span>
+                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">项目级</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-text-primary font-medium truncate">{folderName}</div>
                           <div className="text-[10px] text-text-tertiary font-mono truncate" title={parentPath}>
                             {parentPath}
                           </div>
                         </div>
-                        <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">文件来源</span>
+                        <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-sm border border-border-subtle shrink-0">文件来源</span>
                       </div>
                     );
                   })()}
@@ -498,7 +498,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div key={dist.id} className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border-subtle">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(dist.status)} />
-                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-radius-sm border border-border-subtle shrink-0">项目级</span>
+                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">项目级</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-text-primary font-medium truncate">{containerName}</div>
                           <div className="text-[10px] text-text-tertiary font-mono truncate" title={grandparentPath}>
@@ -541,7 +541,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
           <h3 className="text-sm font-medium text-text-primary mb-3 shrink-0"
             style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)", fontWeight: 400 }}
           >文件结构</h3>
-          <div className="border border-border-subtle rounded-radius-lg overflow-hidden flex flex-1 min-h-0 bg-bg-elevated">
+          <div className="border border-border-subtle rounded-lg overflow-hidden flex flex-1 min-h-0 bg-bg-elevated">
             {files.length > 0 ? (
               <div className="overflow-y-auto py-1 w-full">
                 <FileTree

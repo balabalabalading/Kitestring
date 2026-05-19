@@ -175,7 +175,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
             {ignoredPaths.map((p) => (
               <div key={p} className="flex items-center gap-2">
                 <span
-                  className="flex-1 text-xs font-mono text-text-secondary bg-bg-base px-2.5 py-1.5 rounded-radius-md border border-border-subtle truncate"
+                  className="flex-1 text-xs font-mono text-text-secondary bg-bg-base px-2.5 py-1.5 rounded-md border border-border-subtle truncate"
                   title={p}
                 >
                   {p}
@@ -206,7 +206,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
         {/* Feedback */}
         {error && (
           <div
-            className="text-xs text-status-broken px-3 py-2 rounded-radius-md"
+            className="text-xs text-status-broken px-3 py-2 rounded-md"
             style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}
           >
             {error}
@@ -214,7 +214,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
         )}
         {saved && (
           <div
-            className="text-xs text-status-linked px-3 py-2 rounded-radius-md"
+            className="text-xs text-status-linked px-3 py-2 rounded-md"
             style={{ backgroundColor: "color-mix(in srgb, var(--status-linked) 8%, transparent)" }}
           >
             已保存
@@ -231,7 +231,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
             {discovering ? "扫描中..." : "从工具路径发现并导入 Skills"}
           </Button>
           {discoverResult && (
-            <div className="mt-2 text-xs text-text-secondary bg-bg-base px-3 py-2 rounded-radius-md border border-border-subtle">
+            <div className="mt-2 text-xs text-text-secondary bg-bg-base px-3 py-2 rounded-md border border-border-subtle">
               {discoverResult}
             </div>
           )}
@@ -260,7 +260,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
                 <button
                   onClick={handleClearAll}
                   disabled={clearing}
-                  className="text-xs px-3 py-1 rounded-radius-md text-white disabled:opacity-50 transition-colors"
+                  className="text-xs px-3 py-1 rounded-md text-white disabled:opacity-50 transition-colors"
                   style={{ backgroundColor: "var(--status-broken)" }}
                 >
                   {clearing ? "清空中..." : "确认清空"}
@@ -288,7 +288,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`flex-1 text-xs py-1.5 rounded-radius-md border transition-colors ${
+                className={`flex-1 text-xs py-1.5 rounded-md border transition-colors ${
                   mode === m
                     ? "border-accent-sky text-accent-sky"
                     : "border-border-subtle text-text-tertiary hover:text-text-secondary"

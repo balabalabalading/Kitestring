@@ -207,7 +207,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
         </p>
         {distError && (
           <p
-            className="mt-2 text-xs text-status-broken px-3 py-1.5 rounded-radius-md"
+            className="mt-2 text-xs text-status-broken px-3 py-1.5 rounded-md"
             style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}
           >
             {distError}
@@ -249,7 +249,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
               <button
                 key={skill.id}
                 onClick={() => onSelectSkill(skill)}
-                className="w-full text-left border border-border-subtle rounded-radius-lg bg-bg-surface hover:border-accent-sky/40 hover:shadow-sm transition-all px-4 py-3"
+                className="w-full text-left border border-border-subtle rounded-lg bg-bg-surface hover:border-accent-sky/40 hover:shadow-sm transition-all px-4 py-3"
               >
                 <div className="text-sm font-medium text-text-primary truncate">{skill.name}</div>
                 {skill.description && (
@@ -279,7 +279,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
               autoFocus
               className="mb-2"
             />
-            <div className="overflow-y-auto border border-border-subtle rounded-radius-md min-h-[120px] max-h-[200px]">
+            <div className="overflow-y-auto border border-border-subtle rounded-md min-h-[120px] max-h-[200px]">
               {filteredAddSkills.length === 0 ? (
                 <div className="p-3 text-xs text-text-tertiary">无匹配 Skill</div>
               ) : (

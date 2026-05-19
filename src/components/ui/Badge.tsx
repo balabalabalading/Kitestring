@@ -19,7 +19,7 @@ interface ScopeBadgeProps {
 
 function ScopeBadge({ scope }: ScopeBadgeProps) {
   return (
-    <span className="text-[10px] text-text-tertiary bg-text-tertiary/6 px-1 py-0.5 rounded-radius-sm leading-none">
+    <span className="text-[10px] text-text-tertiary bg-text-tertiary/6 px-1 py-0.5 rounded-sm leading-none">
       {scope}
     </span>
   );

@@ -8,7 +8,7 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const baseClasses =
-  "rounded-radius-lg border transition-all duration-[var(--duration-fast)] ease-[var(--ease-out)]";
+  "rounded-lg border transition-all duration-[var(--duration-fast)] ease-[var(--ease-out)]";
 
 const variantClasses: Record<CardVariant, string> = {
   base: "bg-bg-elevated border-border-subtle hover:border-border-default",

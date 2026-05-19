@@ -94,7 +94,7 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
 
         {error && (
           <div
-            className="text-xs text-status-broken px-3 py-2 rounded-radius-md"
+            className="text-xs text-status-broken px-3 py-2 rounded-md"
             style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}
           >
             {error}

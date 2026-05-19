@@ -331,7 +331,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         <nav className="flex-1 overflow-y-auto py-2">
 
           {/* Projects section — always visible header */}
-          <div className="mx-2 mb-1 bg-bg-surface rounded-radius-lg border border-border-subtle">
+          <div className="mx-2 mb-1 bg-bg-surface rounded-lg border border-border-subtle">
             <div className="flex items-center px-3 py-1.5">
               <button
                 onClick={() => setProjectsCollapsed((c) => !c)}
@@ -346,7 +346,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               <button
                 onClick={() => setShowCreateProject(true)}
                 title="新建项目"
-                className="w-6 h-6 rounded-radius-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors shrink-0"
+                className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors shrink-0"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -381,7 +381,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           </div>
 
           {/* Skills section — always visible header */}
-          <div className="mx-2 bg-bg-surface rounded-radius-lg border border-border-subtle">
+          <div className="mx-2 bg-bg-surface rounded-lg border border-border-subtle">
             <div className="flex items-center px-3 py-1.5">
               <button
                 onClick={() => setSkillsCollapsed((c) => !c)}
@@ -398,7 +398,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 <button
                   onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
                   title="创建分组"
-                  className="w-6 h-6 rounded-radius-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors"
+                  className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -412,7 +412,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     setError(null);
                   }}
                   title="导入 Skill"
-                  className="w-6 h-6 rounded-radius-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors"
+                  className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -421,7 +421,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 </button>
 
                 {showImportPopover && (
-                  <div className="absolute right-0 top-7 bg-bg-base rounded-radius-lg shadow-[var(--shadow-lg)] border border-border-default py-1 z-30 w-52">
+                  <div className="absolute right-0 top-7 bg-bg-base rounded-lg shadow-[var(--shadow-lg)] border border-border-default py-1 z-30 w-52">
                     {!showGithubInput ? (
                       <>
                         <button
@@ -478,7 +478,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                       </div>
                     )}
                     {error && (
-                      <div className="mx-3 mb-2 text-xs text-status-broken bg-status-broken/10 px-2 py-1.5 rounded-radius-sm">
+                      <div className="mx-3 mb-2 text-xs text-status-broken bg-status-broken/10 px-2 py-1.5 rounded-sm">
                         {error}
                       </div>
                     )}
@@ -503,7 +503,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="搜索 Skills..."
-                    className="w-full text-xs pl-6 pr-2 py-1 rounded-radius-sm bg-bg-elevated border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary"
+                    className="w-full text-xs pl-6 pr-2 py-1 rounded-sm bg-bg-elevated border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary"
                   />
                 </div>
               </div>
@@ -524,7 +524,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                           if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverGroup(null);
                         }}
                         onDrop={(e) => handleDropOnGroup(e, groupLabel)}
-                        className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded-radius-sm transition-colors border border-dashed ${
+                        className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded-sm transition-colors border border-dashed ${
                           isOver ? "bg-accent-sky-soft text-accent-sky border-accent-sky" : "border-transparent"
                         }`}
                       >
@@ -605,7 +605,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             <button
               onClick={() => setMode(mode === "dark" ? "light" : "dark")}
               title={mode === "dark" ? "切换到亮色模式" : "切换到暗色模式"}
-              className="w-6 h-6 rounded-radius-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+              className="w-6 h-6 rounded-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
             >
               {mode === "dark" ? (
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -622,7 +622,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             <button
               onClick={() => setShowSettings(true)}
               title="设置"
-              className="w-6 h-6 rounded-radius-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+              className="w-6 h-6 rounded-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -645,7 +645,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             <button
               onClick={() => setOverlayOpen(true)}
               title="展开侧边栏"
-              className="p-2 rounded-radius-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+              className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -656,7 +656,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               <button
                 onClick={() => setMode(mode === "dark" ? "light" : "dark")}
                 title={mode === "dark" ? "切换到亮色" : "切换到暗色"}
-                className="p-2 rounded-radius-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+                className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
               >
                 {mode === "dark" ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -673,7 +673,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               <button
                 onClick={() => setShowSettings(true)}
                 title="设置"
-                className="p-2 rounded-radius-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+                className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -756,7 +756,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     value={newGroupSearch}
                     onChange={(e) => setNewGroupSearch(e.target.value)}
                     placeholder="搜索 Skills..."
-                    className="w-full text-xs pl-6 pr-2 py-1.5 rounded-radius-sm border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary bg-bg-elevated"
+                    className="w-full text-xs pl-6 pr-2 py-1.5 rounded-sm border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary bg-bg-elevated"
                   />
                   {newGroupSearch && (
                     <button
@@ -769,7 +769,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     </button>
                   )}
                 </div>
-                <div className="rounded-radius-md border border-border-subtle divide-y divide-border-subtle max-h-44 overflow-y-auto">
+                <div className="rounded-md border border-border-subtle divide-y divide-border-subtle max-h-44 overflow-y-auto">
                   {visibleSkills.map((skill) => (
                     <label
                       key={skill.id}

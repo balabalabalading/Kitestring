@@ -50,7 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={t.id}
               className={[
-                "px-4 py-2 rounded-radius-lg shadow-[var(--shadow-md)] text-sm font-medium",
+                "px-4 py-2 rounded-lg shadow-[var(--shadow-md)] text-sm font-medium",
                 "pointer-events-auto border-l-[3px]",
                 t.exiting
                   ? "animate-[toast-out_200ms_var(--ease-in)_forwards]"

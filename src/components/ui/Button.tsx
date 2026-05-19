@@ -16,12 +16,12 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost:
     "text-accent-sky hover:bg-bg-elevated active:translate-y-[1px]",
   icon:
-    "w-6 h-6 flex items-center justify-center rounded-radius-sm text-text-tertiary hover:bg-bg-elevated hover:text-text-primary active:translate-y-[1px]",
+    "w-6 h-6 flex items-center justify-center rounded-sm text-text-tertiary hover:bg-bg-elevated hover:text-text-primary active:translate-y-[1px]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "text-xs px-3 py-1 rounded-radius-md",
-  md: "text-sm px-4 py-1.5 rounded-radius-md",
+  sm: "text-xs px-3 py-1 rounded-md",
+  md: "text-sm px-4 py-1.5 rounded-md",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
