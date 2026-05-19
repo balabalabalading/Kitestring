@@ -39,7 +39,7 @@ function FileTreeNode({ node, onFileSelect, selectedPath, depth }: FileTreeNodeP
       <div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full text-left px-1.5 py-0.5 hover:bg-bg-surface rounded flex items-center gap-1.5 text-text-primary transition-colors"
+          className="w-full text-left px-1.5 py-0.5 hover:bg-bg-surface rounded-radius-sm flex items-center gap-1.5 text-text-primary transition-colors"
           style={{ paddingLeft: `${depth * 16 + 6}px` }}
         >
           <span className="text-[10px] text-text-tertiary w-3 text-center">
@@ -62,7 +62,7 @@ function FileTreeNode({ node, onFileSelect, selectedPath, depth }: FileTreeNodeP
   return (
     <button
       onClick={() => onFileSelect(node.path)}
-      className={`w-full text-left px-1.5 py-0.5 rounded flex items-center gap-1.5 transition-colors ${
+      className={`w-full text-left px-1.5 py-0.5 rounded-radius-sm flex items-center gap-1.5 transition-colors ${
         selectedPath === node.path
           ? "bg-accent-sky-soft text-accent-sky"
           : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
