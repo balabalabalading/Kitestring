@@ -13,18 +13,6 @@ function SourceBadge({ type }: SourceBadgeProps) {
   );
 }
 
-interface ScopeBadgeProps {
-  scope: "用户级" | "项目级";
-}
-
-function ScopeBadge({ scope }: ScopeBadgeProps) {
-  return (
-    <span className="text-[10px] text-text-tertiary bg-text-tertiary/6 px-1 py-0.5 rounded-sm leading-none">
-      {scope}
-    </span>
-  );
-}
-
 type StatusType = "linked" | "pending" | "broken" | "none";
 
 interface StatusBadgeProps {
@@ -49,5 +37,5 @@ function StatusBadge({ status, showText = false }: StatusBadgeProps) {
   );
 }
 
-export { SourceBadge, ScopeBadge, StatusBadge };
+export { SourceBadge, StatusBadge };
 export type { StatusType };

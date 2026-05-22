@@ -5,6 +5,7 @@ import * as tauri from "../../lib/tauri";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { Tag } from "../ui/Tag";
 import DistributionMatrix from "./DistributionMatrix";
 
 type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
@@ -255,8 +256,16 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
                 {skill.description && (
                   <div className="text-xs text-text-tertiary mt-0.5 line-clamp-2">{skill.description}</div>
                 )}
-                <div className="text-[10px] text-text-tertiary font-mono mt-1 truncate" title={skill.source_path}>
-                  {skill.source_path}
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="text-[10px] text-text-tertiary font-mono truncate flex-1" title={skill.source_path}>
+                    {skill.source_path}
+                  </div>
+                  {(() => {
+                    const entryType = allDists.find((d) => d.skill_id === skill.id)?.entry_type;
+                    if (entryType === "Symlink") return <Tag variant="sky" size="sm" dot>symlink</Tag>;
+                    if (entryType === "Folder") return <Tag variant="default" size="sm" dot>文件夹</Tag>;
+                    return null;
+                  })()}
                 </div>
               </button>
             ))}

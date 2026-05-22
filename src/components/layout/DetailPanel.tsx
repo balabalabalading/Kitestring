@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { Dialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
+import { Tag } from "../ui/Tag";
 import { useToast } from "../ui/Toast";
 
 
@@ -122,10 +123,10 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
               从本地文件夹或 GitHub 仓库导入你的第一个 Skill
             </p>
           </div>
-          <div className="flex gap-3 mt-1 text-xs text-text-tertiary">
-            <span className="px-2.5 py-1 rounded-md border border-border-subtle bg-bg-elevated">📁 本地文件夹</span>
-            <span className="px-2.5 py-1 rounded-md border border-border-subtle bg-bg-elevated">🐙 GitHub 仓库</span>
-          </div>
+            <div className="flex gap-3 mt-1 text-xs text-text-tertiary">
+              <Tag variant="default" size="md">📁 本地文件夹</Tag>
+              <Tag variant="default" size="md">🐙 GitHub 仓库</Tag>
+            </div>
         </main>
       );
     }
@@ -352,19 +353,24 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
           >
             {skill.name}
           </h2>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-bg-surface text-text-tertiary border border-border-subtle">
-            {skill.source_type === "Github" ? "GitHub" : "本地"}
-          </span>
+          {skill.source_type === "Github" ? (
+            <Tag variant="sky" size="md">GitHub</Tag>
+          ) : (
+            <>
+              <Tag variant="earth" size="md">本地</Tag>
+              {skill.has_git && <Tag variant="sky" size="md">GitHub</Tag>}
+            </>
+          )}
           {canPull && (
             <Button variant="secondary" size="sm" onClick={handlePull} disabled={pulling}>
               {pulling ? "拉取中..." : "拉取更新"}
             </Button>
           )}
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
-            className="!text-status-broken"
+            className="!text-status-broken hover:!bg-status-broken/10 hover:!border-status-broken"
           >
             删除 Skill
           </Button>
@@ -429,7 +435,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                   {/* Global path row (always shown) */}
                   <div className="px-3 py-2 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(globalDist?.status ?? "none")} />
-                    <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">用户级</span>
+                    <Tag variant="default" size="xs">用户级</Tag>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-text-primary font-medium truncate">{globalFolderName}</div>
                       <div className="text-[10px] text-text-tertiary font-mono truncate" title={globalGrandparentPath}>
@@ -437,9 +443,9 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                       </div>
                     </div>
                     {isFileSource(tool) ? (
-                      <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-sm border border-border-subtle shrink-0">文件来源</span>
+                      <Tag variant="default" size="sm">文件来源</Tag>
                     ) : globalDist ? (
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
+                      <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                     ) : (
                       <Button variant="primary" size="sm" onClick={() => handleDistribute(tool, "Global")} className="shrink-0">分发</Button>
                     )}
@@ -452,7 +458,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div key={eg.path} className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border-subtle">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(egIsFileSource ? "Linked" : egDist?.status ?? "none")} />
-                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">用户级</span>
+                        <Tag variant="default" size="xs">用户级</Tag>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-text-primary font-medium truncate">{eg.folderName}/*/skills</div>
                           <div className="text-[10px] text-text-tertiary font-mono truncate" title={eg.parentPath}>
@@ -460,9 +466,9 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                           </div>
                         </div>
                         {egIsFileSource ? (
-                          <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-sm border border-border-subtle shrink-0">文件来源</span>
+                          <Tag variant="default" size="sm">文件来源</Tag>
                         ) : egDist ? (
-                          <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
+                          <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                         ) : (
                           <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, eg.path)} className="shrink-0">分发</Button>
                         )}
@@ -478,14 +484,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border-subtle">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "var(--status-linked)" }} />
-                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">项目级</span>
+                        <Tag variant="default" size="xs">项目级</Tag>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-text-primary font-medium truncate">{folderName}</div>
                           <div className="text-[10px] text-text-tertiary font-mono truncate" title={parentPath}>
                             {parentPath}
                           </div>
                         </div>
-                        <span className="text-[10px] text-text-tertiary bg-bg-surface px-1.5 py-0.5 rounded-sm border border-border-subtle shrink-0">文件来源</span>
+                        <Tag variant="default" size="sm">文件来源</Tag>
                       </div>
                     );
                   })()}
@@ -498,14 +504,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div key={dist.id} className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border-subtle">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(dist.status)} />
-                        <span className="text-[9px] text-text-tertiary bg-bg-surface px-1 py-0.5 rounded-sm border border-border-subtle shrink-0">项目级</span>
+                        <Tag variant="default" size="xs">项目级</Tag>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-text-primary font-medium truncate">{containerName}</div>
                           <div className="text-[10px] text-text-tertiary font-mono truncate" title={grandparentPath}>
                             {grandparentPath}
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveDist(dist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
+                        <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(dist.id)} className="!text-text-tertiary hover:!text-status-broken shrink-0 !px-2">取消</Button>
                       </div>
                     );
                   })}

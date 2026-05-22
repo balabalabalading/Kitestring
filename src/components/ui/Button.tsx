@@ -10,11 +10,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "btn-ripple bg-accent-warm text-text-inverse hover:brightness-110 active:translate-y-[1px]",
+    "btn-ripple bg-accent-warm text-text-inverse border border-transparent hover:brightness-110 active:translate-y-[1px]",
   secondary:
     "border border-border-default text-text-secondary hover:bg-bg-elevated active:translate-y-[1px]",
   ghost:
-    "text-accent-sky hover:bg-bg-elevated active:translate-y-[1px]",
+    "text-accent-sky border border-transparent hover:bg-bg-surface active:translate-y-[1px]",
   icon:
     "w-6 h-6 flex items-center justify-center rounded-sm text-text-tertiary hover:bg-bg-elevated hover:text-text-primary active:translate-y-[1px]",
 };
@@ -36,7 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-accent/30",
           "disabled:opacity-40 disabled:pointer-events-none",
           isIcon ? variantClasses.icon : `${variantClasses[variant]} ${sizeClasses[size]}`,
-          variant === "ghost" && "border-0 bg-transparent",
+          variant === "ghost" && "bg-transparent",
           className,
         ]
           .filter(Boolean)
