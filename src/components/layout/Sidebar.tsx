@@ -638,7 +638,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle shrink-0">
-          <Button variant="secondary" size="sm" onClick={closeImportDialog}>取消</Button>
+          <Button variant="secondary" size="sm" onClick={closeImportDialog}>返回</Button>
           <Button
             variant="primary"
             size="sm"

@@ -4,6 +4,7 @@ import { TOOL_DISPLAY_NAMES } from "../../types";
 import * as tauri from "../../lib/tauri";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
 import { Input } from "../ui/Input";
 import { Tag } from "../ui/Tag";
 import DistributionMatrix from "./DistributionMatrix";
@@ -179,26 +180,17 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
   const distributedToolsCount = TOOLS.filter((t) => skillsInToolPath(t).length > 0).length;
 
   return (
-    <main className="flex-1 flex flex-col p-8 min-h-0 overflow-y-auto">
-      {/* Header */}
-      <div className="mb-6 shrink-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-xl font-semibold text-text-primary">{folderName}</h2>
-          {project.path && (
-            <Button variant="secondary" size="sm" onClick={handleRedetect} disabled={redetecting}>
-              {redetecting ? "检测中..." : "重新检测"}
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => { setShowAddSkill(true); setAddSelectedSkillId(null); setAddSearch(""); }}
+    <main className="flex-1 flex flex-col p-4 gap-4 min-h-0 overflow-y-auto">
+      {/* Identity Card/Project */}
+      <Card variant="base" className="p-4 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <h2
+            className="text-text-primary font-normal leading-tight"
+            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h1)" }}
           >
-            添加 Skill
-          </Button>
-          <Button variant="ghost" size="sm" className="!text-status-broken" onClick={() => setShowDeleteConfirm(true)}>
-            删除项目
-          </Button>
+            {folderName}
+          </h2>
+          <Tag variant="earth" size="md">项目</Tag>
         </div>
         {project.path && (
           <p className="text-xs text-text-tertiary font-mono mt-0.5">{project.path}</p>
@@ -214,11 +206,28 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
             {distError}
           </p>
         )}
-      </div>
+        <div className="flex gap-2 mt-3">
+          {project.path && (
+            <Button variant="secondary" size="sm" onClick={handleRedetect} disabled={redetecting}>
+              {redetecting ? "检测中..." : "重新检测"}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => { setShowAddSkill(true); setAddSelectedSkillId(null); setAddSearch(""); }}
+          >
+            添加 Skill
+          </Button>
+          <Button variant="ghost" size="sm" danger onClick={() => setShowDeleteConfirm(true)}>
+            删除项目
+          </Button>
+        </div>
+      </Card>
 
       {/* Distribution matrix */}
       {project.path && (
-        <div className="mb-6 shrink-0">
+        <div className="shrink-0">
           <h3 className="font-normal text-text-primary mb-3"
             style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)" }}
           >分发状态</h3>
@@ -234,7 +243,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       )}
 
       {/* Skills list */}
-      <div className="mb-6 shrink-0">
+      <div className="shrink-0">
         <h3 className="text-sm font-medium text-text-primary mb-3">
           项目中的 Skills
           <span className="ml-2 text-xs font-normal text-text-tertiary">({detectedSkills.length})</span>
@@ -370,7 +379,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
             <Button
               variant="ghost"
               size="sm"
-              className="!text-status-broken"
+              danger
               onClick={handleDeleteProject}
               disabled={deleting}
             >

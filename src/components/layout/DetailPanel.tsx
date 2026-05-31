@@ -316,7 +316,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                 onClick={() => { setKeepSymlinks(false); handleDelete(); }}
                 disabled={deleting}
                 className="w-full justify-start"
-                style={{ backgroundColor: "var(--status-broken)" }}
+                danger
               >
                 {deleting ? "删除中..." : `删除并清理 symlink（${distributions.filter((d) => d.entry_type === "Symlink").length} 个）`}
               </Button>
@@ -386,7 +386,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             variant="secondary"
             size="sm"
             onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
-            className="!text-status-broken hover:!bg-status-broken/10 hover:!border-status-broken"
+            danger
           >
             删除
           </Button>

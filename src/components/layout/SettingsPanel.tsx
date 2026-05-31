@@ -282,7 +282,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                 <div className="border-t border-dashed border-border-subtle pt-4">
                   <div className="text-xs font-semibold text-status-broken mb-2">危险操作</div>
                   {!confirmClear ? (
-                    <Button variant="ghost" size="sm" className="!text-status-broken" onClick={() => setConfirmClear(true)}>
+                    <Button variant="ghost" size="sm" danger onClick={() => setConfirmClear(true)}>
                       清空所有 Skills
                     </Button>
                   ) : (
@@ -298,14 +298,15 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                         <span className="text-xs text-text-secondary">保留 symlink，仅删除 Skill 记录</span>
                       </label>
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          danger
                           onClick={handleClearAll}
                           disabled={clearing}
-                          className="text-xs px-3 py-1 rounded-md text-white disabled:opacity-50 transition-colors"
-                          style={{ backgroundColor: "var(--status-broken)" }}
                         >
                           {clearing ? "清空中..." : "确认清空"}
-                        </button>
+                        </Button>
                         <Button
                           variant="secondary"
                           size="sm"
