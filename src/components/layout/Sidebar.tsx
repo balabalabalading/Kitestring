@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
 import { useTheme } from "../../hooks/useTheme";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -25,7 +25,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   const [projects, setProjects] = useState<Project[]>([]);
   const [gitInfoMap, setGitInfoMap] = useState<Record<string, GitInfo>>({});
   const [query, setQuery] = useState("");
-  const [showImportPopover, setShowImportPopover] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showGithubInput, setShowGithubInput] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -122,24 +122,9 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     openNextConflict(pendingConflicts);
   }
 
-  const importBtnRef = useRef<HTMLButtonElement>(null);
-
   useEffect(() => {
     loadData();
   }, []);
-
-  // Close popover when clicking outside
-  useEffect(() => {
-    if (!showImportPopover) return;
-    function onClickOutside(e: MouseEvent) {
-      if (importBtnRef.current && !importBtnRef.current.closest(".import-popover-root")?.contains(e.target as Node)) {
-        setShowImportPopover(false);
-        setShowGithubInput(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [showImportPopover]);
 
   async function loadData() {
     try {
@@ -167,7 +152,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   }
 
   async function handleLocalImport() {
-    setShowImportPopover(false);
+    setShowImportDialog(false);
     setShowGithubInput(false);
     const selected = await open({ directory: true, multiple: false });
     if (!selected) return;
@@ -272,7 +257,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             return [...prev, ...imported.filter((s) => !existingIds.has(s.id))];
           });
         }
-        setShowImportPopover(false);
+        setShowImportDialog(false);
         setShowGithubInput(false);
         setImportUrl("");
         // Process conflicts sequentially via dialog
@@ -393,7 +378,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 <span className="text-xs font-medium text-text-tertiary tracking-wide">Skills</span>
               </button>
               {/* Import Skill icon — right of Skills header */}
-              <div className="relative import-popover-root shrink-0 flex items-center gap-0.5">
+              <div className="shrink-0 flex items-center gap-0.5">
                 {/* Create group icon */}
                 <button
                   onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
@@ -405,9 +390,8 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                   </svg>
                 </button>
                 <button
-                  ref={importBtnRef}
                   onClick={() => {
-                    setShowImportPopover(!showImportPopover);
+                    setShowImportDialog(true);
                     setShowGithubInput(false);
                     setError(null);
                   }}
@@ -419,71 +403,6 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                       d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
                   </svg>
                 </button>
-
-                {showImportPopover && (
-                  <div className="absolute right-0 top-7 bg-bg-base rounded-lg shadow-[var(--shadow-lg)] border border-border-default py-1 z-30 w-52">
-                    {!showGithubInput ? (
-                      <>
-                        <button
-                          onClick={handleLocalImport}
-                          disabled={loading}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-bg-elevated text-text-primary disabled:opacity-50 flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-                          </svg>
-                          {loading ? "导入中..." : "本地文件夹导入"}
-                        </button>
-                        <button
-                          onClick={() => setShowGithubInput(true)}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-bg-elevated text-text-primary flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4 text-text-tertiary" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.087.636-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-                          </svg>
-                          GitHub 仓库导入
-                        </button>
-                      </>
-                    ) : (
-                      <div className="px-3 py-2 space-y-2">
-                        <div className="text-xs font-medium text-text-tertiary mb-1">GitHub 仓库 URL</div>
-                        <Input
-                          type="text"
-                          value={importUrl}
-                          onChange={(e) => setImportUrl(e.target.value)}
-                          placeholder="https://github.com/..."
-                          mono
-                          onKeyDown={(e) => e.key === "Enter" && handleGithubImport()}
-                          autoFocus
-                        />
-                        <div className="flex gap-1.5">
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={handleGithubImport}
-                            disabled={loading}
-                            className="flex-1"
-                          >
-                            {loading ? "导入中..." : "导入"}
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => { setShowGithubInput(false); setImportUrl(""); setError(null); }}
-                          >
-                            返回
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {error && (
-                      <div className="mx-3 mb-2 text-xs text-status-broken bg-status-broken/10 px-2 py-1.5 rounded-sm">
-                        {error}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -701,6 +620,93 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           {sidebarInner}
         </aside>
       )}
+
+      {/* Import Skill dialog */}
+      <Dialog
+        open={showImportDialog}
+        onClose={() => { setShowImportDialog(false); setShowGithubInput(false); setError(null); }}
+        width="w-96"
+      >
+        {!showGithubInput ? (
+          <>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+              <h3 className="text-sm font-semibold text-text-primary">导入 Skill</h3>
+              <Button variant="icon" onClick={() => { setShowImportDialog(false); setError(null); }}>×</Button>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              <button
+                onClick={handleLocalImport}
+                disabled={loading}
+                className="w-full text-left px-4 py-3 text-sm hover:bg-bg-elevated text-text-primary disabled:opacity-50 flex items-center gap-3 rounded-lg border border-border-subtle transition-colors"
+              >
+                <svg className="w-5 h-5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                </svg>
+                <div>
+                  <div className="font-medium">本地文件夹导入</div>
+                  <div className="text-xs text-text-tertiary mt-0.5">从本地目录导入 Skill</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setShowGithubInput(true)}
+                className="w-full text-left px-4 py-3 text-sm hover:bg-bg-elevated text-text-primary flex items-center gap-3 rounded-lg border border-border-subtle transition-colors"
+              >
+                <svg className="w-5 h-5 text-text-tertiary shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.087.636-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+                </svg>
+                <div>
+                  <div className="font-medium">GitHub 仓库导入</div>
+                  <div className="text-xs text-text-tertiary mt-0.5">从 GitHub 仓库克隆 Skill</div>
+                </div>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+              <h3 className="text-sm font-semibold text-text-primary">GitHub 仓库导入</h3>
+              <Button variant="icon" onClick={() => { setShowImportDialog(false); setShowGithubInput(false); setError(null); }}>×</Button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">仓库 URL</label>
+                <Input
+                  type="text"
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  placeholder="https://github.com/..."
+                  mono
+                  onKeyDown={(e) => e.key === "Enter" && handleGithubImport()}
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <div className="text-xs text-status-broken px-3 py-2 rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}>
+                  {error}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setShowGithubInput(false); setImportUrl(""); setError(null); }}
+              >
+                返回
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleGithubImport}
+                disabled={loading}
+              >
+                {loading ? "导入中..." : "导入"}
+              </Button>
+            </div>
+          </>
+        )}
+      </Dialog>
 
       {/* Create group dialog */}
       {(() => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { ToolPaths } from "../../types";
 import * as tauri from "../../lib/tauri";
-import { Drawer } from "../ui/Drawer";
+import { Dialog } from "../ui/Dialog";
 import { Card } from "../ui/Card";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
@@ -116,7 +116,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
   }
 
   return (
-    <Drawer open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} width="w-[560px]">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
         <h2 className="text-base font-semibold text-text-primary">设置</h2>
@@ -124,7 +124,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="overflow-y-auto px-5 py-4 space-y-4 max-h-[60vh]">
         <p className="text-xs text-text-tertiary">
           配置各 AI 工具的 Skill 目录路径（支持 ~ 路径）
         </p>
@@ -308,6 +308,6 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared }: Settin
           </Button>
         </div>
       </div>
-    </Drawer>
+    </Dialog>
   );
 }
