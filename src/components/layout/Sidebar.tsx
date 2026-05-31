@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
-import { useTheme } from "../../hooks/useTheme";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Skill, Project, GitInfo } from "../../types";
+import type { Skill, Project } from "../../types";
 import * as tauri from "../../lib/tauri";
 import SettingsPanel from "./SettingsPanel";
 import CreateProjectDialog from "../project/CreateProjectDialog";
-import { SourceBadge } from "../ui/Badge";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -23,17 +21,16 @@ interface SidebarProps {
 export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp }: SidebarProps) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [gitInfoMap, setGitInfoMap] = useState<Record<string, GitInfo>>({});
   const [query, setQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"skills" | "projects">("skills");
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showGithubInput, setShowGithubInput] = useState(false);
+  const [importTab, setImportTab] = useState<"local" | "github">("local");
+  const [importLocalPath, setImportLocalPath] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
-  const [skillsCollapsed, setSkillsCollapsed] = useState(false);
-  const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   // Grouping dialog
   const [pendingGroupSkills, setPendingGroupSkills] = useState<Skill[]>([]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
@@ -67,9 +64,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   useEffect(() => {
     if (!isNarrow) setOverlayOpen(false);
   }, [isNarrow]);
-  // Theme
-  const { mode, setMode } = useTheme();
-  // Wrap selection callbacks to close overlay on selection
+
   const onSelectSkill = useCallback((s: Skill | null) => {
     onSelectSkillProp(s);
     setOverlayOpen(false);
@@ -78,6 +73,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     onSelectProjectProp(p);
     setOverlayOpen(false);
   }, [onSelectProjectProp]);
+
+  // Auto-switch tab when selection changes from parent
+  useEffect(() => {
+    if (selectedSkill) setActiveTab("skills");
+  }, [selectedSkill]);
+  useEffect(() => {
+    if (selectedProject) setActiveTab("projects");
+  }, [selectedProject]);
 
   function openNextConflict(queue: tauri.GithubConflict[]) {
     if (queue.length === 0) {
@@ -137,31 +140,29 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       setProjects(projectList);
       setServerGroups(groupList);
       onSkillsLoaded?.(skillList.length);
-      const gitResults = await Promise.allSettled(
-        skillList.map((s) => tauri.getGitInfo(s.source_path))
-      );
-      const gitMap: Record<string, GitInfo> = {};
-      skillList.forEach((s, i) => {
-        const r = gitResults[i];
-        if (r.status === "fulfilled") gitMap[s.id] = r.value;
-      });
-      setGitInfoMap(gitMap);
     } catch (e) {
       console.error("Failed to load data:", e);
     }
   }
 
-  async function handleLocalImport() {
+  function closeImportDialog() {
     setShowImportDialog(false);
-    setShowGithubInput(false);
+    setImportLocalPath("");
+    setImportUrl("");
+    setError(null);
+  }
+
+  async function handleSelectFolder() {
     const selected = await open({ directory: true, multiple: false });
-    if (!selected) return;
-    const path = typeof selected === "string" ? selected : selected;
-    if (!path) return;
+    if (typeof selected === "string" && selected) setImportLocalPath(selected);
+  }
+
+  async function handleLocalImportConfirm() {
+    if (!importLocalPath) return;
     setLoading(true);
     setError(null);
     try {
-      const newSkills = await tauri.importLocalSkill(path);
+      const newSkills = await tauri.importLocalSkill(importLocalPath);
       if (newSkills.length === 0) {
         setError("未找到 SKILL.md，该文件夹可能不包含有效 Skill");
       } else {
@@ -169,6 +170,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           const existingIds = new Set(prev.map((s) => s.id));
           return [...prev, ...newSkills.filter((s) => !existingIds.has(s.id))];
         });
+        closeImportDialog();
         if (newSkills.length > 1) {
           setPendingGroupSkills(newSkills);
           setGroupName("未命名");
@@ -235,7 +237,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     setDragOverGroup(null);
     if (!skillId) return;
     const skill = skills.find((s) => s.id === skillId);
-    if (skill?.group === groupLabel) return; // already in this group
+    if (skill?.group === groupLabel) return;
     await tauri.setSkillGroup(skillId, groupLabel);
     await loadData();
   }
@@ -247,7 +249,6 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     try {
       const result = await tauri.importGithubSkill(importUrl.trim());
       const { imported, conflicts } = result;
-
       if (imported.length === 0 && conflicts.length === 0) {
         setError("未在仓库中找到 SKILL.md");
       } else {
@@ -257,10 +258,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             return [...prev, ...imported.filter((s) => !existingIds.has(s.id))];
           });
         }
-        setShowImportDialog(false);
-        setShowGithubInput(false);
-        setImportUrl("");
-        // Process conflicts sequentially via dialog
+        closeImportDialog();
         if (conflicts.length > 0) {
           openNextConflict(conflicts);
         }
@@ -277,16 +275,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     await loadData();
   }
 
-  // Sort skills A-Z
+  // Sort and filter skills
   const sortedSkills = [...skills].sort((a, b) => a.name.localeCompare(b.name));
-
-  // Filter by search query
   const lowerQuery = query.toLowerCase();
   const filteredSkills = lowerQuery
     ? sortedSkills.filter((s) => s.name.toLowerCase().includes(lowerQuery))
     : sortedSkills;
 
-  // Group skills by group field
+  // Group skills
   const groupedSkills: Map<string, Skill[]> = new Map();
   const ungroupedSkills: Skill[] = [];
   for (const skill of filteredSkills) {
@@ -297,7 +293,6 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       ungroupedSkills.push(skill);
     }
   }
-  // Merge serverGroups (may contain empty groups)
   const allGroupLabels = Array.from(new Set([
     ...Array.from(groupedSkills.keys()),
     ...serverGroups,
@@ -308,249 +303,213 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   const sidebarInner = (
     <>
       {/* Brand strip */}
-        <div
-          className="h-[var(--brand-strip-height)] w-full shrink-0 animate-[brand-breathe_6s_ease-in-out_infinite]"
-          style={{ background: "var(--gradient-skyline)" }}
-        />
-        {/* Skill List */}
-        <nav className="flex-1 overflow-y-auto py-2">
+      <div
+        className="h-[var(--brand-strip-height)] w-full shrink-0 animate-[brand-breathe_6s_ease-in-out_infinite]"
+        style={{ background: "var(--gradient-skyline)" }}
+      />
 
-          {/* Projects section — always visible header */}
-          <div className="mx-2 mb-1 bg-bg-surface rounded-lg border border-border-subtle">
-            <div className="flex items-center px-3 py-1.5">
-              <button
-                onClick={() => setProjectsCollapsed((c) => !c)}
-                className="flex items-center gap-1 flex-1 min-w-0 hover:text-text-primary text-left"
-              >
-                <svg className={`w-3 h-3 text-text-tertiary shrink-0 transition-transform ${projectsCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* App title */}
+      <div className="px-4 pt-4 pb-2 shrink-0">
+        <div
+          className="text-text-primary font-normal leading-tight"
+          style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h1)" }}
+        >
+          Kitestring
+        </div>
+        <div className="text-xs text-text-tertiary mt-0.5">AI 技能管理器</div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center px-4 gap-4 shrink-0 border-b border-border-subtle">
+        {(["skills", "projects"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setActiveTab(tab);
+              if (tab === "skills") onSelectProject(null);
+              else onSelectSkill(null);
+            }}
+            className={`py-2 text-[10px] font-semibold tracking-wider uppercase border-b-2 transition-colors ${
+              activeTab === tab
+                ? "border-accent-warm text-accent-warm"
+                : "border-transparent text-text-tertiary hover:text-text-secondary"
+            }`}
+          >
+            {tab === "skills" ? "Skills" : "Projects"}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <nav className="flex-1 overflow-y-auto py-1">
+        {activeTab === "skills" ? (
+          <>
+            {/* Search + create group toolbar */}
+            <div className="px-3 py-1.5 flex items-center gap-2">
+              <div className="relative flex-1">
+                <svg
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary pointer-events-none"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                 </svg>
-                <span className="text-xs font-medium text-text-tertiary tracking-wide">项目</span>
-              </button>
-              {/* Create project icon — right of 项目 header */}
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="搜索 Skills..."
+                  className="w-full text-xs pl-6 pr-2 py-1 rounded-sm bg-bg-elevated border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary"
+                />
+              </div>
               <button
-                onClick={() => setShowCreateProject(true)}
-                title="新建项目"
+                onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
+                title="创建分组"
                 className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors shrink-0"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 10v6m-3-3h6M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                 </svg>
               </button>
             </div>
-            {!projectsCollapsed && (
-              projects.length === 0 ? (
-                <div className="px-5 py-1.5 pb-2 text-xs text-text-tertiary">暂无项目</div>
-              ) : (
-                <div className="border-t border-dashed border-border-subtle">
-                  {projects.map((project) => {
-                    const isSelected = selectedProject?.id === project.id && !selectedSkill;
-                    return (
-                      <button
-                        key={project.id}
-                        onClick={() => onSelectProject(project)}
-                        className={`relative w-full text-left py-1.5 text-xs transition-colors ${
-                          isSelected
-                            ? "bg-bg-base text-text-primary font-medium before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-accent-warm before:rounded-r-full"
-                            : "text-text-secondary hover:bg-bg-elevated/60"
-                        }`}
-                      >
-                        <span className="truncate block px-5">{project.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )
-            )}
-          </div>
-
-          {/* Skills section — always visible header */}
-          <div className="mx-2 bg-bg-surface rounded-lg border border-border-subtle">
-            <div className="flex items-center px-3 py-1.5">
-              <button
-                onClick={() => setSkillsCollapsed((c) => !c)}
-                className="flex items-center gap-1 flex-1 min-w-0 hover:text-text-primary text-left"
-              >
-                <svg className={`w-3 h-3 text-text-tertiary shrink-0 transition-transform ${skillsCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </svg>
-                <span className="text-xs font-medium text-text-tertiary tracking-wide">Skills</span>
-              </button>
-              {/* Import Skill icon — right of Skills header */}
-              <div className="shrink-0 flex items-center gap-0.5">
-                {/* Create group icon */}
-                <button
-                  onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
-                  title="创建分组"
-                  className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => {
-                    setShowImportDialog(true);
-                    setShowGithubInput(false);
-                    setError(null);
-                  }}
-                  title="导入 Skill"
-                  className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Search box — below Skills header */}
-            {!skillsCollapsed && (
-              <div className="px-3 pb-1.5 pt-1 border-t border-dashed border-border-subtle">
-                <div className="relative">
-                  <svg
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary pointer-events-none"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-                  </svg>
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="搜索 Skills..."
-                    className="w-full text-xs pl-6 pr-2 py-1 rounded-sm bg-bg-elevated border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Grouped skills */}
-            {!skillsCollapsed && (
-              <>
-                {allGroupLabels.map((groupLabel) => {
-                  const groupSkills = groupedSkills.get(groupLabel) ?? [];
-                  const isOver = dragOverGroup === groupLabel;
-                  const isGroupCollapsed = collapsedGroups.has(groupLabel);
-                  return (
-                    <div key={groupLabel}>
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupLabel); }}
-                        onDragLeave={(e) => {
-                          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverGroup(null);
-                        }}
-                        onDrop={(e) => handleDropOnGroup(e, groupLabel)}
-                        className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded-sm transition-colors border border-dashed ${
-                          isOver ? "bg-accent-sky-soft text-accent-sky border-accent-sky" : "border-transparent"
-                        }`}
+            {allGroupLabels.map((groupLabel) => {
+              const groupSkills = groupedSkills.get(groupLabel) ?? [];
+              const isOver = dragOverGroup === groupLabel;
+              const isGroupCollapsed = collapsedGroups.has(groupLabel);
+              return (
+                <div key={groupLabel}>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupLabel); }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverGroup(null);
+                    }}
+                    onDrop={(e) => handleDropOnGroup(e, groupLabel)}
+                    className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded-sm transition-colors border border-dashed ${
+                      isOver ? "bg-accent-sky-soft text-accent-sky border-accent-sky" : "border-transparent"
+                    }`}
+                  >
+                    <button
+                      onClick={() => toggleGroupCollapse(groupLabel)}
+                      className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors"
+                      title={isGroupCollapsed ? "展开分组" : "折叠分组"}
+                    >
+                      <svg className={`w-2.5 h-2.5 transition-transform ${isGroupCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    </button>
+                    <svg className="w-2.5 h-2.5 shrink-0 opacity-60" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                    </svg>
+                    <span className="truncate">{groupLabel}</span>
+                    {!isOver && (
+                      <span className="ml-auto text-[9px] normal-case font-normal opacity-60 shrink-0">{groupSkills.length}</span>
+                    )}
+                    {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
+                    {!isOver && groupSkills.length === 0 && (
+                      <button
+                        onClick={() => handleDeleteGroup(groupLabel)}
+                        className="text-text-tertiary hover:text-status-broken transition-colors"
+                        title="删除空分组"
                       >
-                        {/* Collapse/expand toggle */}
-                        <button
-                          onClick={() => toggleGroupCollapse(groupLabel)}
-                          className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors"
-                          title={isGroupCollapsed ? "展开分组" : "折叠分组"}
-                        >
-                          <svg className={`w-2.5 h-2.5 transition-transform ${isGroupCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                          </svg>
-                        </button>
-                        <svg className="w-2.5 h-2.5 shrink-0 opacity-60" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                        <span className="truncate">{groupLabel}</span>
-                        {!isOver && (
-                          <span className="ml-auto text-[9px] normal-case font-normal opacity-60 shrink-0">{groupSkills.length}</span>
-                        )}
-                        {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
-                        {!isOver && groupSkills.length === 0 && (
-                          <button
-                            onClick={() => handleDeleteGroup(groupLabel)}
-                            className="text-text-tertiary hover:text-status-broken transition-colors"
-                            title="删除空分组"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                      {!isGroupCollapsed && groupSkills.map((skill) => (
-                        <SkillItem
-                          key={skill.id}
-                          skill={skill}
-                          selected={selectedSkill?.id === skill.id}
-                          onSelect={() => onSelectSkill(skill)}
-                          gitInfo={gitInfoMap[skill.id]}
-                          indent
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-                {ungroupedSkills.map((skill) => (
-                  <SkillItem
-                    key={skill.id}
-                    skill={skill}
-                    selected={selectedSkill?.id === skill.id}
-                    onSelect={() => onSelectSkill(skill)}
-                    gitInfo={gitInfoMap[skill.id]}
-                  />
-                ))}
-              </>
-            )}
+                      </button>
+                    )}
+                  </div>
+                  {!isGroupCollapsed && groupSkills.map((skill) => (
+                    <SkillItem
+                      key={skill.id}
+                      skill={skill}
+                      selected={selectedSkill?.id === skill.id}
+                      onSelect={() => onSelectSkill(skill)}
+                      indent
+                    />
+                  ))}
+                </div>
+              );
+            })}
 
-            {!skillsCollapsed && !hasSkills && (
+            {ungroupedSkills.map((skill) => (
+              <SkillItem
+                key={skill.id}
+                skill={skill}
+                selected={selectedSkill?.id === skill.id}
+                onSelect={() => onSelectSkill(skill)}
+              />
+            ))}
+
+            {!hasSkills && (
               <div className="px-5 py-4 text-xs text-text-tertiary">
-                点击右侧 ↓ 导入第一个 Skill
+                点击下方「+ 导入 Skill」开始
               </div>
             )}
-            {!skillsCollapsed && hasSkills && filteredSkills.length === 0 && query && (
+            {hasSkills && filteredSkills.length === 0 && query && (
               <div className="px-5 py-3 text-xs text-text-tertiary leading-relaxed">
                 <div>没有匹配的结果</div>
                 <div className="text-[10px] mt-0.5">尝试更换关键词</div>
               </div>
             )}
-          </div>
-        </nav>
+          </>
+        ) : (
+          <>
+            {projects.length === 0 ? (
+              <div className="px-5 py-4 text-xs text-text-tertiary">
+                点击下方「+ 导入项目」开始
+              </div>
+            ) : (
+              projects.map((project) => {
+                const isSelected = selectedProject?.id === project.id;
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => onSelectProject(project)}
+                    className={`relative w-full text-left py-1.5 text-xs transition-colors ${
+                      isSelected
+                        ? "bg-bg-base text-text-primary font-medium before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-accent-warm before:rounded-r-full"
+                        : "text-text-secondary hover:bg-bg-elevated/60"
+                    }`}
+                  >
+                    <span className="truncate block px-5">{project.name}</span>
+                  </button>
+                );
+              })
+            )}
+          </>
+        )}
+      </nav>
 
-        {/* Footer */}
-        <div className="px-4 py-2 border-t border-border-subtle flex items-center justify-between">
-          <span className="text-xs text-text-tertiary">v0.1.0</span>
-          <div className="flex items-center gap-1">
-            {/* 主题快捷切换 */}
-            <button
-              onClick={() => setMode(mode === "dark" ? "light" : "dark")}
-              title={mode === "dark" ? "切换到亮色模式" : "切换到暗色模式"}
-              className="w-6 h-6 rounded-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
-            >
-              {mode === "dark" ? (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              title="设置"
-              className="w-6 h-6 rounded-sm flex items-center justify-center text-text-tertiary hover:bg-bg-elevated hover:text-text-primary transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          </div>
-        </div>
+      {/* Footer */}
+      <div className="px-4 py-2 border-t border-border-subtle flex items-center justify-between shrink-0">
+        <button
+          onClick={() => setShowSettings(true)}
+          className="text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          设置
+        </button>
+        {activeTab === "skills" ? (
+          <button
+            onClick={() => { setImportTab("local"); setShowImportDialog(true); setError(null); }}
+            className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
+          >
+            + 导入 Skill
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowCreateProject(true)}
+            className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
+          >
+            + 导入项目
+          </button>
+        )}
+      </div>
     </>
   );
 
@@ -570,25 +529,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="mt-auto flex flex-col gap-1">
-              {/* 主题快捷切换 */}
-              <button
-                onClick={() => setMode(mode === "dark" ? "light" : "dark")}
-                title={mode === "dark" ? "切换到亮色" : "切换到暗色"}
-                className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
-              >
-                {mode === "dark" ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                  </svg>
-                )}
-              </button>
+            <div className="mt-auto">
               <button
                 onClick={() => setShowSettings(true)}
                 title="设置"
@@ -622,55 +563,60 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       )}
 
       {/* Import Skill dialog */}
-      <Dialog
-        open={showImportDialog}
-        onClose={() => { setShowImportDialog(false); setShowGithubInput(false); setError(null); }}
-        width="w-96"
-      >
-        {!showGithubInput ? (
-          <>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-              <h3 className="text-sm font-semibold text-text-primary">导入 Skill</h3>
-              <Button variant="icon" onClick={() => { setShowImportDialog(false); setError(null); }}>×</Button>
-            </div>
-            <div className="px-5 py-4 space-y-2">
-              <button
-                onClick={handleLocalImport}
-                disabled={loading}
-                className="w-full text-left px-4 py-3 text-sm hover:bg-bg-elevated text-text-primary disabled:opacity-50 flex items-center gap-3 rounded-lg border border-border-subtle transition-colors"
-              >
-                <svg className="w-5 h-5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-                </svg>
-                <div>
-                  <div className="font-medium">本地文件夹导入</div>
-                  <div className="text-xs text-text-tertiary mt-0.5">从本地目录导入 Skill</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setShowGithubInput(true)}
-                className="w-full text-left px-4 py-3 text-sm hover:bg-bg-elevated text-text-primary flex items-center gap-3 rounded-lg border border-border-subtle transition-colors"
-              >
-                <svg className="w-5 h-5 text-text-tertiary shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.087.636-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-                </svg>
-                <div>
-                  <div className="font-medium">GitHub 仓库导入</div>
-                  <div className="text-xs text-text-tertiary mt-0.5">从 GitHub 仓库克隆 Skill</div>
-                </div>
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-              <h3 className="text-sm font-semibold text-text-primary">GitHub 仓库导入</h3>
-              <Button variant="icon" onClick={() => { setShowImportDialog(false); setShowGithubInput(false); setError(null); }}>×</Button>
-            </div>
-            <div className="px-5 py-4 space-y-3">
+      <Dialog open={showImportDialog} onClose={closeImportDialog} width="w-[480px]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
+          <h3 className="text-sm font-semibold text-text-primary">导入 Skill</h3>
+          <Button variant="icon" onClick={closeImportDialog}>×</Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center px-5 gap-4 border-b border-border-subtle shrink-0">
+          {(["local", "github"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => { setImportTab(tab); setError(null); }}
+              className={`py-2 text-xs font-medium border-b-2 transition-colors ${
+                importTab === tab
+                  ? "border-accent-warm text-accent-warm"
+                  : "border-transparent text-text-tertiary hover:text-text-secondary"
+              }`}
+            >
+              {tab === "local" ? "本地文件夹" : "Github 仓库"}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="px-5 py-4 space-y-3">
+          {importTab === "local" ? (
+            <>
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">仓库 URL</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">文件夹路径</label>
+                <div className="flex gap-2">
+                  <Input
+                    mono
+                    value={importLocalPath}
+                    readOnly
+                    placeholder="选择文件夹..."
+                    className="flex-1"
+                  />
+                  <Button variant="secondary" size="sm" onClick={handleSelectFolder}>
+                    选择文件夹
+                  </Button>
+                </div>
+                <p className="text-[10px] text-text-tertiary mt-1">Skill 文件夹需包含 SKILL.md 文件</p>
+              </div>
+              {error && (
+                <div className="text-xs text-status-broken px-3 py-2 rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}>
+                  {error}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">仓库地址</label>
                 <Input
                   type="text"
                   value={importUrl}
@@ -686,26 +632,22 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                   {error}
                 </div>
               )}
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => { setShowGithubInput(false); setImportUrl(""); setError(null); }}
-              >
-                返回
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleGithubImport}
-                disabled={loading}
-              >
-                {loading ? "导入中..." : "导入"}
-              </Button>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle shrink-0">
+          <Button variant="secondary" size="sm" onClick={closeImportDialog}>取消</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={importTab === "local" ? handleLocalImportConfirm : handleGithubImport}
+            disabled={loading || (importTab === "local" && !importLocalPath)}
+          >
+            {loading ? "导入中..." : "导入"}
+          </Button>
+        </div>
       </Dialog>
 
       {/* Create group dialog */}
@@ -714,9 +656,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         const lowerSearch = newGroupSearch.trim().toLowerCase();
         let visibleSkills: typeof candidateSkills;
         if (lowerSearch) {
-          visibleSkills = candidateSkills.filter((s) =>
-            s.name.toLowerCase().includes(lowerSearch)
-          );
+          visibleSkills = candidateSkills.filter((s) => s.name.toLowerCase().includes(lowerSearch));
         } else {
           const selected = candidateSkills.filter((s) => newGroupSelectedSkills.has(s.id));
           const unselected = candidateSkills.filter((s) => !newGroupSelectedSkills.has(s.id));
@@ -752,7 +692,6 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     <span className="text-[10px] text-accent-sky">{newGroupSelectedSkills.size} 已选</span>
                   )}
                 </div>
-                {/* Search box */}
                 <div className="relative mb-1.5">
                   <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
@@ -828,11 +767,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       })()}
 
       {/* Grouping dialog */}
-      <Dialog
-        open={showGroupDialog}
-        onClose={() => setShowGroupDialog(false)}
-        width="w-80"
-      >
+      <Dialog open={showGroupDialog} onClose={() => setShowGroupDialog(false)} width="w-80">
         <div className="px-5 py-4 border-b border-border-subtle">
           <h3 className="text-sm font-semibold text-text-primary">将 Skills 分组</h3>
         </div>
@@ -862,11 +797,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       </Dialog>
 
       {/* GitHub import conflict dialog */}
-      <Dialog
-        open={showConflictDialog && !!currentConflict}
-        onClose={handleConflictSkip}
-        width="w-96"
-      >
+      <Dialog open={showConflictDialog && !!currentConflict} onClose={handleConflictSkip} width="w-96">
         {currentConflict && (
           <>
             <div className="px-5 py-4 border-b border-border-subtle">
@@ -884,17 +815,11 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               )}
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle">
-              <Button variant="secondary" size="sm" onClick={handleConflictSkip}>
-                跳过
-              </Button>
+              <Button variant="secondary" size="sm" onClick={handleConflictSkip}>跳过</Button>
               {currentConflict.has_git ? (
-                <Button variant="primary" size="sm" onClick={handleConflictPull}>
-                  拉取更新
-                </Button>
+                <Button variant="primary" size="sm" onClick={handleConflictPull}>拉取更新</Button>
               ) : (
-                <Button variant="primary" size="sm" onClick={handleConflictCreate}>
-                  创建新 Skill
-                </Button>
+                <Button variant="primary" size="sm" onClick={handleConflictCreate}>创建新 Skill</Button>
               )}
             </div>
           </>
@@ -906,8 +831,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         onClose={() => setShowSettings(false)}
         onSkillsCleared={() => {
           setShowSettings(false);
+          loadData();
           onSkillsCleared?.();
         }}
+        onSkillsImported={() => loadData()}
       />
       <CreateProjectDialog
         open={showCreateProject}
@@ -918,37 +845,25 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   );
 }
 
-function getRepoName(skill: Skill, gitInfo?: GitInfo): string | null {
-  if (skill.source_type === "Github" && skill.github_url) {
-    const parts = skill.github_url.replace(/\.git$/, "").split("/");
-    return parts[parts.length - 1] || null;
-  }
-  if (gitInfo?.is_git_repo) {
-    if (gitInfo.remote_url) {
-      const parts = gitInfo.remote_url.replace(/\.git$/, "").split("/");
-      return parts[parts.length - 1] || null;
-    }
-    const parts = skill.source_path.replace(/\/$/, "").split("/");
-    return parts[parts.length - 1] || null;
-  }
-  return null;
-}
-
 function SkillItem({
   skill,
   selected,
   onSelect,
-  gitInfo,
   indent = false,
 }: {
   skill: Skill;
   selected: boolean;
   onSelect: () => void;
-  gitInfo?: GitInfo;
   indent?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
-  const repoName = getRepoName(skill, gitInfo);
+
+  function getSourceLabel(): string {
+    if (skill.source_type === "Github") return "Github";
+    if (skill.has_git) return "本地 · Github";
+    return "本地";
+  }
+
   return (
     <button
       onClick={onSelect}
@@ -968,23 +883,8 @@ function SkillItem({
           : "text-text-secondary hover:bg-bg-elevated/60"
       } ${isDragging ? "animate-[drag-breathe_1.5s_ease-in-out_infinite]" : ""}`}
     >
-      <div className="flex items-center justify-between w-full gap-1">
-        <span className="truncate flex-1 text-xs">{skill.name}</span>
-        <span className="flex items-center gap-0.5 shrink-0">
-          {skill.source_type !== "Github" && (
-            <SourceBadge type="local" />
-          )}
-          {(skill.has_git || skill.source_type === "Github") && (
-            <SourceBadge type="github" />
-          )}
-        </span>
-      </div>
-      {repoName && (
-        <span className="text-[10px] text-text-tertiary truncate w-full leading-tight">
-          {repoName}
-        </span>
-      )}
+      <span className="truncate text-xs">{skill.name}</span>
+      <span className="text-[10px] text-text-tertiary leading-tight">{getSourceLabel()}</span>
     </button>
   );
 }
-

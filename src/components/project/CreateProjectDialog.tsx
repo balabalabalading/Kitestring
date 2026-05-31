@@ -55,7 +55,7 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
     <Dialog open={isOpen} onClose={onClose}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-        <h2 className="text-base font-semibold text-text-primary">新建项目</h2>
+        <h2 className="text-base font-semibold text-text-primary">导入项目</h2>
         <Button variant="icon" onClick={onClose}>×</Button>
       </div>
 

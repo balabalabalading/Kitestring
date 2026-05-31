@@ -298,7 +298,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       {/* Delete confirmation dialog */}
       <Dialog open={confirmDelete} onClose={() => { setConfirmDelete(false); setActionError(null); }}>
         <div className="p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-2">删除 Skill</h3>
+          <h3 className="text-sm font-semibold text-text-primary mb-2">删除技能</h3>
           <p className="text-xs text-text-secondary mb-1">
             确认从 Kitestring 中移除「{skill.name}」？
           </p>
@@ -361,19 +361,6 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
               {skill.has_git && <Tag variant="sky" size="md">GitHub</Tag>}
             </>
           )}
-          {canPull && (
-            <Button variant="secondary" size="sm" onClick={handlePull} disabled={pulling}>
-              {pulling ? "拉取中..." : "拉取更新"}
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
-            className="!text-status-broken hover:!bg-status-broken/10 hover:!border-status-broken"
-          >
-            删除 Skill
-          </Button>
         </div>
         {skill.description && (
           <p className="text-sm text-text-secondary mt-1 leading-relaxed">{skill.description}</p>
@@ -389,6 +376,21 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             )}
           </p>
         )}
+        <div className="flex gap-2 mt-3">
+          {canPull && (
+            <Button variant="secondary" size="sm" onClick={handlePull} disabled={pulling}>
+              {pulling ? "拉取中..." : "拉取更新"}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
+            className="!text-status-broken hover:!bg-status-broken/10 hover:!border-status-broken"
+          >
+            删除
+          </Button>
+        </div>
       </Card>
 
       {/* Content & Distribution — fills remaining height */}
