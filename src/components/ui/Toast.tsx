@@ -44,21 +44,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => {
           const isError = t.status === "error";
           const borderColor = isError ? "var(--status-broken)" : "var(--status-linked)";
-          const bgColor = isError ? "color-mix(in srgb, var(--status-broken) 15%, var(--bg-surface))" : "color-mix(in srgb, var(--status-linked) 15%, var(--bg-surface))";
-          const textColor = isError ? "var(--status-broken)" : "var(--status-linked)";
           return (
             <div
               key={t.id}
               className={[
-                "px-4 py-2 rounded-lg shadow-[var(--shadow-md)] text-sm font-medium",
-                "pointer-events-auto border-l-[3px]",
+                "flex items-center h-10 rounded-sm bg-bg-elevated shadow-[var(--shadow-md)] overflow-hidden",
+                "pointer-events-auto",
                 t.exiting
                   ? "animate-[toast-out_200ms_var(--ease-in)_forwards]"
                   : "animate-[toast-in_300ms_var(--ease-bounce)]",
               ].join(" ")}
-              style={{ borderLeftColor: borderColor, backgroundColor: bgColor, color: textColor }}
             >
-              {t.msg}
+              <div className="w-1 self-stretch flex-shrink-0" style={{ backgroundColor: borderColor }} />
+              <div className="pl-3 pr-4 text-[13px] text-text-primary">
+                {t.msg}
+              </div>
             </div>
           );
         })}

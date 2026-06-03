@@ -12,7 +12,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "btn-ripple bg-accent-warm text-text-inverse border border-transparent hover:brightness-110 active:translate-y-[1px]",
+    "btn-ripple bg-accent-warm text-white border border-transparent hover:brightness-110 active:translate-y-[1px]",
   secondary:
     "border border-border-default text-text-secondary hover:bg-bg-elevated active:translate-y-[1px]",
   ghost:
@@ -28,8 +28,8 @@ const dangerOverrides: Partial<Record<ButtonVariant, string>> = {
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "text-xs px-3 py-1 rounded-md",
-  md: "text-sm px-4 py-1.5 rounded-md",
+  sm: "text-xs px-3 py-[3.5px] rounded-sm",
+  md: "text-[13px] px-4 py-[6.5px] rounded-sm",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

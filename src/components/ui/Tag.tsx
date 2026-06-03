@@ -25,9 +25,9 @@ const dotClasses: Record<TagVariant, string> = {
 };
 
 const sizeClasses: Record<TagSize, string> = {
-  xs: "text-[9px] px-1 py-[1px] rounded-sm",
+  xs: "text-[9px] px-1 py-[1px] rounded-[3px]",
   sm: "text-[10px] px-1.5 py-0.5 rounded",
-  md: "text-xs px-2 py-0.5 rounded-md",
+  md: "text-xs px-2 py-0.5 rounded-sm",
 };
 
 export function Tag({

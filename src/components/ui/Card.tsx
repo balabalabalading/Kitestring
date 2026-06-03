@@ -8,13 +8,13 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const baseClasses =
-  "rounded-lg border transition-all duration-[var(--duration-fast)] ease-[var(--ease-out)]";
+  "transition-all duration-[var(--duration-fast)] ease-[var(--ease-out)]";
 
 const variantClasses: Record<CardVariant, string> = {
-  base: "bg-bg-elevated border-border-subtle hover:border-border-default",
-  tool: "bg-bg-elevated border-border-subtle hover:border-border-default relative overflow-hidden",
+  base: "rounded-lg bg-bg-elevated border border-border-subtle hover:border-border-default",
+  tool: "rounded-[10px] bg-bg-elevated relative overflow-hidden",
   "drag-over":
-    "border-2 border-dashed border-accent-sky bg-accent-sky-soft shadow-[var(--shadow-md)] animate-[brand-breathe_2s_ease-in-out_infinite]",
+    "rounded-lg border-2 border-dashed border-accent-sky bg-accent-sky-soft shadow-[var(--shadow-md)] animate-[brand-breathe_2s_ease-in-out_infinite]",
 };
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(

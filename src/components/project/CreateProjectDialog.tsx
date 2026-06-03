@@ -55,14 +55,14 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
     <Dialog open={isOpen} onClose={onClose}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-        <h2 className="text-base font-semibold text-text-primary">导入项目</h2>
+        <h2 className="text-sm font-normal text-text-primary">导入项目</h2>
         <Button variant="icon" onClick={onClose}>×</Button>
       </div>
 
       {/* Body */}
       <div className="px-5 py-4 space-y-3">
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label className="block text-xs font-normal text-text-secondary mb-1">
             项目目录
           </label>
           <div className="flex gap-2">
@@ -80,7 +80,7 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label className="block text-xs font-normal text-text-secondary mb-1">
             项目名称
           </label>
           <Input

@@ -4,9 +4,7 @@ import { TOOL_DISPLAY_NAMES } from "../../types";
 import * as tauri from "../../lib/tauri";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
-import { Card } from "../ui/Card";
 import { Input } from "../ui/Input";
-import { Tag } from "../ui/Tag";
 import DistributionMatrix from "./DistributionMatrix";
 
 type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
@@ -180,38 +178,45 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
   const distributedToolsCount = TOOLS.filter((t) => skillsInToolPath(t).length > 0).length;
 
   return (
-    <main className="flex-1 flex flex-col p-4 gap-4 min-h-0 overflow-y-auto">
+    <main className="flex-1 flex flex-col px-6 py-8 gap-5 min-h-0 overflow-y-auto">
       {/* Identity Card/Project */}
-      <Card variant="base" className="p-4 shrink-0">
-        <div className="flex items-center gap-2 flex-wrap mb-1">
-          <h2
-            className="text-text-primary font-normal leading-tight"
-            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h1)" }}
-          >
-            {folderName}
-          </h2>
-          <Tag variant="earth" size="md">项目</Tag>
+      <div className="bg-bg-elevated rounded-[12px] px-6 py-3 flex flex-col gap-3 shrink-0">
+        {/* Head: title + desc */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3 h-8">
+            <h2 className="text-[22px] font-medium text-text-primary leading-none">
+              {folderName}
+            </h2>
+          </div>
         </div>
-        {project.path && (
-          <p className="text-xs text-text-tertiary font-mono mt-0.5">{project.path}</p>
-        )}
-        <p className="text-xs text-text-tertiary mt-1">
-          {detectedSkills.length} 个技能 · {distributedToolsCount} 个工具已分发
-        </p>
+
+        {/* Meta rows */}
+        <div className="flex flex-col gap-1">
+          {project.path && (
+            <div className="flex items-center gap-3 h-[14px]">
+              <span className="text-[10px] font-semibold text-text-tertiary w-5 shrink-0">路径</span>
+              <span className="text-[10px] text-text-secondary font-mono truncate">{project.path}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-3 h-[14px]">
+            <span className="text-[10px] font-semibold text-text-tertiary w-5 shrink-0">技能</span>
+            <span className="text-[10px] text-text-secondary">
+              {detectedSkills.length} 个 · {distributedToolsCount} 个工具已分发
+            </span>
+          </div>
+        </div>
+
         {distError && (
           <p
-            className="mt-2 text-xs text-status-broken px-3 py-1.5 rounded-md"
+            className="text-xs text-status-broken px-3 py-1.5 rounded-sm"
             style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}
           >
             {distError}
           </p>
         )}
-        <div className="flex gap-2 mt-3">
-          {project.path && (
-            <Button variant="secondary" size="sm" onClick={handleRedetect} disabled={redetecting}>
-              {redetecting ? "检测中..." : "重新检测"}
-            </Button>
-          )}
+
+        {/* Buttons */}
+        <div className="flex items-center gap-3">
           <Button
             variant="secondary"
             size="sm"
@@ -219,18 +224,20 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
           >
             添加 Skill
           </Button>
+          {project.path && (
+            <Button variant="secondary" size="sm" onClick={handleRedetect} disabled={redetecting}>
+              {redetecting ? "检测中..." : "重新扫描"}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" danger onClick={() => setShowDeleteConfirm(true)}>
-            删除项目
+            删除
           </Button>
         </div>
-      </Card>
+      </div>
 
-      {/* Distribution matrix */}
+      {/* Project Skills List (matrix) */}
       {project.path && (
         <div className="shrink-0">
-          <h3 className="font-normal text-text-primary mb-3"
-            style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)" }}
-          >分发状态</h3>
           <DistributionMatrix
             skills={detectedSkills}
             tools={TOOLS}
@@ -238,58 +245,40 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
             getToolProjectPath={getToolProjectPath}
             onDistribute={handleDistribute}
             onRemoveDist={handleRemoveDist}
+            onSelectSkill={onSelectSkill}
           />
         </div>
       )}
 
-      {/* Skills list */}
-      <div className="shrink-0">
-        <h3 className="text-sm font-medium text-text-primary mb-3">
-          项目中的 Skills
-          <span className="ml-2 text-xs font-normal text-text-tertiary">({detectedSkills.length})</span>
-        </h3>
-
-        {detectedSkills.length === 0 ? (
-          <div className="text-sm text-text-tertiary py-2">
-            {projectPath ? "暂未在此文件夹下检测到 Skill" : "暂无 Skill"}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {detectedSkills.map((skill) => (
-              <button
-                key={skill.id}
-                onClick={() => onSelectSkill(skill)}
-                className="w-full text-left border border-border-subtle rounded-lg bg-bg-surface hover:border-accent-sky/40 hover:shadow-sm transition-all px-4 py-3"
-              >
-                <div className="text-sm font-medium text-text-primary truncate">{skill.name}</div>
-                {skill.description && (
-                  <div className="text-xs text-text-tertiary mt-0.5 line-clamp-2">{skill.description}</div>
-                )}
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="text-[10px] text-text-tertiary font-mono truncate flex-1" title={skill.source_path}>
-                    {skill.source_path}
-                  </div>
-                  {(() => {
-                    const entryType = allDists.find((d) => d.skill_id === skill.id)?.entry_type;
-                    if (entryType === "Symlink") return <Tag variant="sky" size="sm" dot>symlink</Tag>;
-                    if (entryType === "Folder") return <Tag variant="default" size="sm" dot>文件夹</Tag>;
-                    return null;
-                  })()}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* No path: simple skills list */}
+      {!project.path && (
+        <div className="shrink-0">
+          {detectedSkills.length === 0 ? (
+            <div className="text-sm text-text-tertiary py-2">暂无 Skill</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {detectedSkills.map((skill) => (
+                <button
+                  key={skill.id}
+                  onClick={() => onSelectSkill(skill)}
+                  className="w-full text-left h-[40px] flex items-center gap-2 px-2 hover:bg-bg-surface transition-colors rounded"
+                >
+                  <span className="text-[12px] text-text-primary truncate">{skill.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Skill dialog */}
       <Dialog open={showAddSkill} onClose={() => setShowAddSkill(false)} width="w-[480px]">
         <div className="p-5 flex flex-col gap-4 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-text-primary shrink-0">添加 Skill 到项目</h3>
+          <h3 className="text-sm font-normal text-text-primary shrink-0">添加 Skill 到项目</h3>
 
           {/* Skill picker */}
           <div className="flex flex-col min-h-0">
-            <label className="text-xs font-medium text-text-primary mb-1.5">选择 Skill</label>
+            <label className="text-xs font-normal text-text-secondary mb-1.5">选择 Skill</label>
             <Input
               value={addSearch}
               onChange={(e) => setAddSearch(e.target.value)}
@@ -323,7 +312,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
 
           {/* Tool selector */}
           <div>
-            <label className="text-xs font-medium text-text-primary mb-1.5 block">分发到工具路径</label>
+            <label className="text-xs font-normal text-text-secondary mb-1.5 block">分发到工具路径</label>
             <div className="flex flex-wrap gap-3">
               {TOOLS.map((tool) => (
                 <label key={tool} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
@@ -360,16 +349,16 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
 
       {/* Delete confirmation dialog */}
       <Dialog open={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteError(null); }}>
-        <div className="p-5 flex flex-col gap-4">
-          <h3 className="text-base font-semibold text-text-primary">删除项目</h3>
-          <p className="text-sm text-text-secondary">
+        <div className="p-6 flex flex-col gap-4">
+          <h3 className="text-[14px] font-normal text-text-primary">删除项目</h3>
+          <p className="text-[13px] text-text-secondary">
             确认删除项目「{project.name}」？<br />
             <span className="text-text-tertiary">不会删除本地文件夹，仅从 Kitestring 中移除记录。</span>
           </p>
           {deleteError && <p className="text-xs text-status-broken">{deleteError}</p>}
           <div className="flex gap-2 justify-end">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
               disabled={deleting}

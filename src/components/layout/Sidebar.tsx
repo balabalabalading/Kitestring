@@ -566,7 +566,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       <Dialog open={showImportDialog} onClose={closeImportDialog} width="w-[480px]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
-          <h3 className="text-sm font-semibold text-text-primary">导入 Skill</h3>
+          <h3 className="text-sm font-normal text-text-primary">导入 Skill</h3>
           <Button variant="icon" onClick={closeImportDialog}>×</Button>
         </div>
 
@@ -592,7 +592,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           {importTab === "local" ? (
             <>
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">文件夹路径</label>
+                <label className="block text-xs font-normal text-text-secondary mb-1">文件夹路径</label>
                 <div className="flex gap-2">
                   <Input
                     mono
@@ -616,7 +616,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           ) : (
             <>
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">仓库地址</label>
+                <label className="block text-xs font-normal text-text-secondary mb-1">仓库地址</label>
                 <Input
                   type="text"
                   value={importUrl}
@@ -637,7 +637,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle shrink-0">
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle shrink-0">
           <Button variant="secondary" size="sm" onClick={closeImportDialog}>返回</Button>
           <Button
             variant="primary"
@@ -669,11 +669,11 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             width="w-80"
           >
             <div className="px-5 py-4 border-b border-border-subtle">
-              <h3 className="text-sm font-semibold text-text-primary">创建分组</h3>
+              <h3 className="text-sm font-normal text-text-primary">创建分组</h3>
             </div>
             <div className="px-5 py-4 space-y-4 overflow-y-auto">
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">分组名称</label>
+                <label className="block text-xs font-normal text-text-secondary mb-1">分组名称</label>
                 <Input
                   type="text"
                   value={newGroupName}
@@ -684,7 +684,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               </div>
               <div>
                 <div className="flex items-baseline justify-between mb-1.5">
-                  <label className="text-xs font-medium text-text-secondary">
+                  <label className="text-xs font-normal text-text-secondary">
                     选择 Skills
                     <span className="ml-1 font-normal text-text-tertiary">（至少选一个）</span>
                   </label>
@@ -745,7 +745,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle">
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle">
               <Button
                 variant="secondary"
                 size="sm"
@@ -768,15 +768,13 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
 
       {/* Grouping dialog */}
       <Dialog open={showGroupDialog} onClose={() => setShowGroupDialog(false)} width="w-80">
-        <div className="px-5 py-4 border-b border-border-subtle">
-          <h3 className="text-sm font-semibold text-text-primary">将 Skills 分组</h3>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          <p className="text-xs text-text-secondary">
+        <div className="p-6 flex flex-col gap-4">
+          <h3 className="text-[14px] font-normal text-text-primary">将 Skills 分组</h3>
+          <p className="text-[13px] text-text-secondary">
             检测到 <span className="font-medium">{pendingGroupSkills.length}</span> 个 Skills，是否将其归为一组？
           </p>
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">组名</label>
+            <label className="block text-xs font-normal text-text-secondary mb-1">组名</label>
             <Input
               type="text"
               value={groupName}
@@ -785,27 +783,25 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               onKeyDown={(e) => e.key === "Enter" && handleConfirmGroup()}
             />
           </div>
-        </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle">
-          <Button variant="secondary" size="sm" onClick={() => setShowGroupDialog(false)}>
-            不分组
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleConfirmGroup}>
-            确认分组
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowGroupDialog(false)}>
+              不分组
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleConfirmGroup}>
+              确认分组
+            </Button>
+          </div>
         </div>
       </Dialog>
 
       {/* GitHub import conflict dialog */}
       <Dialog open={showConflictDialog && !!currentConflict} onClose={handleConflictSkip} width="w-96">
         {currentConflict && (
-          <>
-            <div className="px-5 py-4 border-b border-border-subtle">
-              <h3 className="text-sm font-semibold text-text-primary">Skill 已存在</h3>
-            </div>
-            <div className="px-5 py-4 space-y-2">
-              <p className="text-sm text-text-primary">
-                <span className="font-medium">「{currentConflict.skill_name}」</span>
+          <div className="p-6 flex flex-col gap-4">
+            <h3 className="text-[14px] font-normal text-text-primary">Skill 已存在</h3>
+            <div className="flex flex-col gap-1">
+              <p className="text-[13px] text-text-secondary">
+                「{currentConflict.skill_name}」
                 {currentConflict.has_git
                   ? " 已存在，且包含 Git 仓库，要拉取最新版本吗？"
                   : " 已存在（无 Git 仓库），要创建为新 Skill 吗？"}
@@ -814,15 +810,15 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 <p className="text-xs text-text-tertiary">还有 {pendingConflicts.length} 个冲突待处理</p>
               )}
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle">
-              <Button variant="secondary" size="sm" onClick={handleConflictSkip}>跳过</Button>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={handleConflictSkip}>跳过</Button>
               {currentConflict.has_git ? (
                 <Button variant="primary" size="sm" onClick={handleConflictPull}>拉取更新</Button>
               ) : (
                 <Button variant="primary" size="sm" onClick={handleConflictCreate}>创建新 Skill</Button>
               )}
             </div>
-          </>
+          </div>
         )}
       </Dialog>
 

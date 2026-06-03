@@ -58,7 +58,7 @@ export function Dialog({ open, onClose, children, width = "w-96" }: DialogProps)
         ref={contentRef}
         data-state={state}
         className={[
-          "relative bg-bg-surface rounded-xl shadow-[var(--shadow-lg)] flex flex-col max-h-[85vh]",
+          "relative bg-bg-surface rounded-lg shadow-[var(--shadow-lg)] flex flex-col max-h-[85vh]",
           width,
           state === "open"
             ? "animate-[dialog-in_250ms_var(--ease-bounce)_forwards]"
