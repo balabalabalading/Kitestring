@@ -39,9 +39,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
   const [ignoredPaths, setIgnoredPaths] = useState<string[]>([]);
   const [newIgnoredPath, setNewIgnoredPath] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [keepSymlinksOnClear, setKeepSymlinksOnClear] = useState(false);
@@ -59,12 +57,23 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
     });
   }, []);
 
+  // 实时保存：paths 变化时自动保存
+  useEffect(() => {
+    if (loading) return;
+    tauri.updateToolPaths(paths).catch((e) => setError(String(e)));
+  }, [paths, loading]);
+
+  // 实时保存：ignoredPaths 变化时自动保存
+  useEffect(() => {
+    if (loading) return;
+    tauri.updateIgnoredPaths(ignoredPaths).catch((e) => setError(String(e)));
+  }, [ignoredPaths, loading]);
+
   function updatePath(tool: string, field: "global" | "project", value: string) {
     setPaths((prev) => ({
       ...prev,
       [tool]: { ...prev[tool], [field]: value },
     }));
-    setSaved(false);
   }
 
   function addIgnoredPath() {
@@ -72,26 +81,10 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
     if (!trimmed || ignoredPaths.includes(trimmed)) return;
     setIgnoredPaths((prev) => [...prev, trimmed]);
     setNewIgnoredPath("");
-    setSaved(false);
   }
 
   function removeIgnoredPath(path: string) {
     setIgnoredPaths((prev) => prev.filter((p) => p !== path));
-    setSaved(false);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      await tauri.updateToolPaths(paths);
-      await tauri.updateIgnoredPaths(ignoredPaths);
-      setSaved(true);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function handleDiscover() {
@@ -137,7 +130,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       <button
         onClick={handleDiscover}
         disabled={discovering}
-        className="self-start text-[11px] text-text-secondary px-[10px] h-6 rounded-sm transition-colors hover:text-text-primary disabled:opacity-50"
+        className="self-start text-[11px] text-text-tertiary px-[10px] h-7 rounded-md border border-border-default transition-colors hover:text-text-secondary disabled:opacity-50"
       >
         {discovering ? "扫描中..." : "从工具路径发现并导入 Skills"}
       </button>
@@ -164,7 +157,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
-              onClick={() => { setSettingsTab(item.id); setSaved(false); setError(null); setDiscoverResult(null); }}
+              onClick={() => { setSettingsTab(item.id); setError(null); setDiscoverResult(null); }}
               className={`w-full flex items-center text-left pl-5 pr-4 h-9 text-[13px] transition-colors border-l-2 ${
                 settingsTab === item.id
                   ? "text-text-primary font-bold border-accent-sky"
@@ -190,10 +183,10 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                   <button
                     key={m}
                     onClick={() => setMode(m)}
-                    className={`flex-1 text-[11px] h-7 rounded-sm flex items-center justify-center transition-colors ${
+                    className={`flex-1 text-[11px] h-7 rounded-md flex items-center justify-center transition-colors border ${
                       mode === m
-                        ? "text-accent-sky"
-                        : "text-text-tertiary hover:text-text-secondary"
+                        ? "text-accent-sky border-accent-sky"
+                        : "text-text-tertiary border-border-default hover:text-text-secondary"
                     }`}
                     style={mode === m ? { backgroundColor: "color-mix(in srgb, var(--accent-sky) 8%, transparent)" } : undefined}
                   >
@@ -237,11 +230,6 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                   </div>
                 ))
               )}
-              <div className="flex justify-end">
-                <Button variant="primary" size="sm" onClick={handleSave} disabled={saving || loading}>
-                  {saving ? "保存中..." : "保存"}
-                </Button>
-              </div>
             </>
           )}
 
@@ -285,11 +273,6 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                   添加
                 </button>
               </div>
-              <div className="flex justify-end">
-                <Button variant="primary" size="sm" onClick={handleSave} disabled={saving || loading}>
-                  {saving ? "保存中..." : "保存"}
-                </Button>
-              </div>
             </>
           )}
 
@@ -306,7 +289,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
               {!confirmClear ? (
                 <button
                   onClick={() => setConfirmClear(true)}
-                  className="self-start text-[11px] text-status-broken px-[10px] h-6 rounded-sm transition-colors"
+                  className="self-start text-[11px] text-status-broken px-[10px] h-7 rounded-md border border-status-broken transition-colors"
                   style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}
                 >
                   清空所有 Skills
@@ -348,12 +331,12 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
           {settingsTab === "about" && (
             <>
               <div className="text-sm font-bold text-text-primary">关于</div>
-              <div className="flex flex-col gap-2 bg-bg-elevated rounded-md px-5 pt-6 pb-6">
+              <div className="flex flex-col items-center gap-2 bg-bg-elevated rounded-lg px-5 pt-6 pb-6">
                 <div className="text-[22px] font-bold text-text-primary">Kitestring</div>
-                <div className="text-[12px] text-text-secondary">AI Agent 技能包管理工具</div>
+                <div className="text-[12px] text-text-secondary">AI Agent Skill 管理工具</div>
                 <div className="text-[11px] text-text-tertiary">v0.1.0</div>
               </div>
-              <div className="text-[11px] text-text-tertiary">© 2025 Kitestring. 基于 Tauri 2 构建</div>
+              <div className="text-[11px] text-text-tertiary">Copyright 2026 Kitestring</div>
               <div className="text-sm font-bold text-text-primary">联系我</div>
               <div className="text-[11px] font-semibold text-text-secondary whitespace-pre-line">
                 {"我的邮箱：huz00036@gmail.com\nGithub 仓库地址：https://github.com/balabalabalading/Kitestring"}
@@ -368,14 +351,6 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
               style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}
             >
               {error}
-            </div>
-          )}
-          {saved && (
-            <div
-              className="text-[11px] text-status-linked px-3 py-2 rounded-sm"
-              style={{ backgroundColor: "color-mix(in srgb, var(--status-linked) 8%, transparent)" }}
-            >
-              已保存
             </div>
           )}
         </div>
