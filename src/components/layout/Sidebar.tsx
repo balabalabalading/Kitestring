@@ -16,9 +16,12 @@ interface SidebarProps {
   onSkillsLoaded?: (count: number) => void;
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
+  controlledImportOpen?: boolean;
+  controlledImportTab?: "local" | "github";
+  onControlledImportClose?: () => void;
 }
 
-export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp }: SidebarProps) {
+export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp, controlledImportOpen, controlledImportTab, onControlledImportClose }: SidebarProps) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [query, setQuery] = useState("");
@@ -81,6 +84,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   useEffect(() => {
     if (selectedProject) setActiveTab("projects");
   }, [selectedProject]);
+
+  // Sync controlled import state
+  useEffect(() => {
+    if (controlledImportOpen && controlledImportTab) {
+      setImportTab(controlledImportTab);
+      setShowImportDialog(true);
+    }
+  }, [controlledImportOpen, controlledImportTab]);
 
   function openNextConflict(queue: tauri.GithubConflict[]) {
     if (queue.length === 0) {
@@ -150,6 +161,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     setImportLocalPath("");
     setImportUrl("");
     setError(null);
+    onControlledImportClose?.();
   }
 
   async function handleSelectFolder() {
@@ -443,7 +455,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
 
             {!hasSkills && (
               <div className="px-5 py-4 text-xs text-text-tertiary">
-                点击下方「+ 导入 Skill」开始
+                暂无 Skill，先导入一个技能
               </div>
             )}
             {hasSkills && filteredSkills.length === 0 && query && (
@@ -496,7 +508,11 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         </button>
         {activeTab === "skills" ? (
           <button
-            onClick={() => { setImportTab("local"); setShowImportDialog(true); setError(null); }}
+            onClick={() => {
+              setImportTab("local");
+              setShowImportDialog(true);
+              setError(null);
+            }}
             className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
           >
             + 导入 Skill
@@ -563,7 +579,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       )}
 
       {/* Import Skill dialog */}
-      <Dialog open={showImportDialog} onClose={closeImportDialog} width="w-[480px]">
+      <Dialog open={showImportDialog || !!controlledImportOpen} onClose={closeImportDialog} width="w-[480px]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
           <h3 className="text-sm font-normal text-text-primary">导入 Skill</h3>
@@ -575,7 +591,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           {(["local", "github"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => { setImportTab(tab); setError(null); }}
+              onClick={() => {
+                setImportTab(tab);
+                setError(null);
+              }}
               className={`py-2 text-xs font-medium border-b-2 transition-colors ${
                 importTab === tab
                   ? "border-accent-warm text-accent-warm"

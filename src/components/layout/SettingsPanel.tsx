@@ -288,7 +288,10 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
               </div>
               {!confirmClear ? (
                 <button
-                  onClick={() => setConfirmClear(true)}
+                  onClick={() => {
+                    setKeepSymlinksOnClear(true);
+                    setConfirmClear(true);
+                  }}
                   className="self-start text-[11px] text-status-broken px-[10px] h-7 rounded-md border border-status-broken transition-colors"
                   style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}
                 >

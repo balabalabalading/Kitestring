@@ -16,11 +16,14 @@ interface DetailPanelProps {
   totalSkillsCount: number;
   onSkillDeleted: (id: string) => void;
   onSkillPulled: () => void;
+  onImport?: (tab: "local" | "github") => void;
+  onDiscover?: () => void;
+  onCreateProject?: () => void;
 }
 
 const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
 
-export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, onSkillPulled }: DetailPanelProps) {
+export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, onSkillPulled, onImport, onDiscover, onCreateProject }: DetailPanelProps) {
   const [distributions, setDistributions] = useState<Distribution[]>([]);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [files, setFiles] = useState<tauri.FileNode[]>([]);
@@ -103,30 +106,108 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
     // 首次启动：没有任何 Skill
     if (totalSkillsCount === 0) {
       return (
-        <main className="flex-1 flex flex-col items-center justify-center gap-5 text-text-tertiary px-8">
-          <svg
-            width="64" height="64" viewBox="0 0 56 56" fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="animate-[kite-float_4s_ease-in-out_infinite] opacity-80"
-            style={{ color: "var(--accent-warm)" }}
-          >
-            <path d="M28 4 L50 28 L28 48 L6 28 Z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
-            <line x1="6" y1="28" x2="50" y2="28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
-            <line x1="28" y1="4" x2="28" y2="48" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
-            <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          </svg>
-          <div className="text-center">
-            <p style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h2)", color: "var(--text-primary)" }} className="mb-2">
-              开始编织你的 AI 技能网络
-            </p>
-            <p className="text-sm text-text-tertiary leading-relaxed">
-              从本地文件夹或 GitHub 仓库导入你的第一个 Skill
-            </p>
-          </div>
-            <div className="flex gap-3 mt-1 text-xs text-text-tertiary">
-              <Tag variant="default" size="md">📁 本地文件夹</Tag>
-              <Tag variant="default" size="md">🐙 GitHub 仓库</Tag>
+        <main className="flex-1 flex flex-col items-center justify-center text-text-tertiary px-8 py-12 overflow-y-auto min-h-full">
+          <div className="flex flex-col gap-8 w-[540px]">
+            {/* header */}
+            <div className="flex flex-col gap-1 w-[488px]">
+              <div className="flex items-center gap-1">
+                <svg
+                  width="38" height="34" viewBox="0 0 56 56" fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="animate-[kite-float_4s_ease-in-out_infinite] opacity-80 shrink-0"
+                  style={{ color: "var(--accent-warm)" }}
+                >
+                  <path d="M28 4 L50 28 L28 48 L6 28 Z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+                  <line x1="6" y1="28" x2="50" y2="28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+                  <line x1="28" y1="4" x2="28" y2="48" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+                  <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                </svg>
+                <p style={{ fontFamily: "var(--font-serif)", fontSize: "24px", fontWeight: 500, color: "var(--text-primary)" }}>
+                  开始编织你的 Skill 网络
+                </p>
+              </div>
+              <p className="text-[13px] text-text-secondary">
+                支持 Git 版本追踪 • symlink 链接分发 • Claude / Copilot / Gemini / Codex / Agent
+              </p>
             </div>
+
+            {/* skill import */}
+            <div className="flex flex-col gap-3">
+              <p style={{ fontFamily: "var(--font-serif)", fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>
+                导入 Skill
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <p className="text-[14px] text-text-primary" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
+                  创建 Skill 实例。适用于全局型的 Skill，创建实例后可以分发至任意路径：
+                </p>
+
+                {/* 方式 1：检索工具路径 */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[13px] text-text-secondary">从 Claude/Copilot/Gemini/Codex/Agent 的默认用户路径中检索已存在的 skills 并导入：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={onDiscover}
+                  >
+                    检索工具默认用户路径并导入
+                  </Button>
+                </div>
+
+                {/* 方式 2：本地文件夹 */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[13px] text-text-secondary">选择本地文件夹并导入该文件夹包含的所有 skills：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => onImport?.("local")}
+                  >
+                    选择本地文件夹并导入
+                  </Button>
+                </div>
+
+                {/* 方式 3：GitHub */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[13px] text-text-secondary">从 Github 导入：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => onImport?.("github")}
+                  >
+                    输入 Github 链接并导入
+                  </Button>
+                </div>
+
+                <div className="flex flex-col gap-1 pt-4">
+                  <p className="text-[14px] text-text-primary" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
+                    创建项目。适用于多工具同时使用的场景，支持将同一 Skill 分发至多个工具：
+                  </p>
+                  <p className="text-[13px] text-text-secondary">选择本地文件夹并导入，同时创建项目，以项目维度管理：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={onCreateProject}
+                  >
+                    选择本地文件夹并导入，同时创建项目
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* skill export */}
+            <div className="flex flex-col gap-3">
+              <p style={{ fontFamily: "var(--font-serif)", fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>
+                分发 Skill
+              </p>
+              <p className="text-[13px] text-text-secondary">
+                成功导入 Skill 后，即可在 Skill 或项目详情页创建指向 Skill 的 symlink。
+              </p>
+            </div>
+          </div>
         </main>
       );
     }
@@ -573,4 +654,3 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
   </>
   );
 }
-

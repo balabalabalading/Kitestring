@@ -104,7 +104,7 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
 
       {/* Footer */}
       <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle">
-        <Button variant="secondary" size="sm" onClick={onClose}>取消</Button>
+        <Button variant="secondary" size="sm" onClick={onClose}>返回</Button>
         <Button variant="primary" size="sm" onClick={handleCreate} disabled={loading}>
           {loading ? "创建中..." : "创建"}
         </Button>

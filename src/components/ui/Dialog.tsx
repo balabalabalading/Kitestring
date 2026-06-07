@@ -11,12 +11,16 @@ export function Dialog({ open, onClose, children, width = "w-96" }: DialogProps)
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<"closed" | "open">("closed");
   const contentRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
 
   useEffect(() => {
+    openRef.current = open;
     if (open) {
       setMounted(true);
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => setState("open"));
+        requestAnimationFrame(() => {
+          if (openRef.current) setState("open");
+        });
       });
     } else if (mounted) {
       setState("closed");
@@ -24,7 +28,7 @@ export function Dialog({ open, onClose, children, width = "w-96" }: DialogProps)
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTransitionEnd = () => {
-    if (state === "closed") {
+    if (state === "closed" && !openRef.current) {
       setMounted(false);
     }
   };
