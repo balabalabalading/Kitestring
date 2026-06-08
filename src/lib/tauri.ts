@@ -149,6 +149,6 @@ export async function updateIgnoredPaths(ignoredPaths: string[]): Promise<void> 
   return invoke("update_ignored_paths", { ignoredPaths });
 }
 
-export async function readSkillFile(path: string): Promise<string> {
-  return invoke("read_skill_file", { path });
+export async function readSkillFile(skillId: string, relativePath: string): Promise<string> {
+  return invoke("read_skill_file", { skillId, relativePath });
 }

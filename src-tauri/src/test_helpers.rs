@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::models::config::{set_config_dir_for_test, save_config, AppConfig};
+use crate::models::config::{save_config, set_config_dir_for_test, AppConfig};
 use crate::models::skill::{Skill, SourceType};
 
 /// Set up isolated test environment with a temp config directory.

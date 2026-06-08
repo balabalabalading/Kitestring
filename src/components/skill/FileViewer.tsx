@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import * as tauri from "../../lib/tauri";
 
 interface FileViewerProps {
-  skillSourcePath: string;
+  skillId: string;
   relativePath: string;
 }
 
-export default function FileViewer({ skillSourcePath, relativePath }: FileViewerProps) {
+export default function FileViewer({ skillId, relativePath }: FileViewerProps) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -14,17 +14,15 @@ export default function FileViewer({ skillSourcePath, relativePath }: FileViewer
   useEffect(() => {
     setLoading(true);
     setError(null);
-    // Construct absolute path: source_path + relative_path
-    const absolutePath = `${skillSourcePath}/${relativePath}`;
     tauri
-      .readSkillFile(absolutePath)
+      .readSkillFile(skillId, relativePath)
       .then((text) => {
         setContent(text);
         setError(null);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [skillSourcePath, relativePath]);
+  }, [skillId, relativePath]);
 
   if (loading) {
     return (

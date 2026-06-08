@@ -138,13 +138,11 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     setAddLoading(true);
     setDistError(null);
     try {
-      await Promise.all(
-        Array.from(addSelectedTools).map((tool) => {
-          const toolPath = getToolProjectPath(tool);
-          if (!toolPath) return Promise.resolve();
-          return tauri.distributeToDir(addSelectedSkillId, tool, toolPath);
-        })
-      );
+      for (const tool of Array.from(addSelectedTools)) {
+        const toolPath = getToolProjectPath(tool);
+        if (!toolPath) continue;
+        await tauri.distributeToDir(addSelectedSkillId, tool, toolPath);
+      }
       await reload();
       setShowAddSkill(false);
       setAddSelectedSkillId(null);
