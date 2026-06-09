@@ -6,6 +6,8 @@ import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import DistributionMatrix from "./DistributionMatrix";
+import { useI18n } from "../../i18n/I18nProvider";
+import { translateError } from "../../i18n/errors";
 
 type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
 const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
@@ -18,6 +20,7 @@ interface ProjectPanelProps {
 }
 
 export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill, onSkillsUpdated }: ProjectPanelProps) {
+  const { locale, t } = useI18n();
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
   const [allDists, setAllDists] = useState<Distribution[]>([]);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
@@ -102,7 +105,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       await tauri.rescanProject(project.id);      await reload();
       onSkillsUpdated?.();
     } catch (e) {
-      setDistError(String(e));
+      setDistError(translateError(e, locale));
     } finally {
       setRedetecting(false);
     }
@@ -111,7 +114,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
   async function handleDistribute(skillId: string, tool: Tool) {
     const toolPath = getToolProjectPath(tool);
     if (!toolPath) {
-      setDistError("未配置工具项目路径");
+      setDistError(t("project.errorToolPathMissing"));
       return;
     }
     setDistError(null);
@@ -119,7 +122,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       await tauri.distributeToDir(skillId, tool, toolPath);
       await reload();
     } catch (e) {
-      setDistError(String(e));
+      setDistError(translateError(e, locale));
     }
   }
 
@@ -129,7 +132,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       await tauri.removeDistribution(distId);
       await reload();
     } catch (e) {
-      setDistError(String(e));
+      setDistError(translateError(e, locale));
     }
   }
 
@@ -148,7 +151,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       setAddSelectedSkillId(null);
       setAddSearch("");
     } catch (e) {
-      setDistError(String(e));
+      setDistError(translateError(e, locale));
     } finally {
       setAddLoading(false);
     }
@@ -162,7 +165,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       setShowDeleteConfirm(false);
       onProjectDeleted(project.id);
     } catch (e) {
-      setDeleteError(String(e));
+      setDeleteError(translateError(e, locale));
     } finally {
       setDeleting(false);
     }
@@ -192,14 +195,14 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
         <div className="flex flex-col gap-1">
           {project.path && (
             <div className="flex items-center gap-3 h-[14px]">
-              <span className="text-[10px] font-semibold text-text-tertiary w-5 shrink-0">路径</span>
+              <span className="text-[10px] font-semibold text-text-tertiary w-5 shrink-0">{t("project.path")}</span>
               <span className="text-[10px] text-text-secondary font-mono truncate">{project.path}</span>
             </div>
           )}
           <div className="flex items-center gap-3 h-[14px]">
-            <span className="text-[10px] font-semibold text-text-tertiary w-5 shrink-0">技能</span>
+            <span className="text-[10px] font-semibold text-text-tertiary w-5 shrink-0">{t("project.skills")}</span>
             <span className="text-[10px] text-text-secondary">
-              {detectedSkills.length} 个 · {distributedToolsCount} 个工具已分发
+              {t("project.summary", { skills: detectedSkills.length, tools: distributedToolsCount })}
             </span>
           </div>
         </div>
@@ -220,15 +223,15 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
             size="sm"
             onClick={() => { setShowAddSkill(true); setAddSelectedSkillId(null); setAddSearch(""); }}
           >
-            添加 Skill
+            {t("project.addSkill")}
           </Button>
           {project.path && (
             <Button variant="secondary" size="sm" onClick={handleRedetect} disabled={redetecting}>
-              {redetecting ? "检测中..." : "重新扫描"}
+              {redetecting ? t("project.detecting") : t("project.rescan")}
             </Button>
           )}
           <Button variant="ghost" size="sm" danger onClick={() => setShowDeleteConfirm(true)}>
-            删除
+            {t("common.delete")}
           </Button>
         </div>
       </div>
@@ -252,7 +255,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       {!project.path && (
         <div className="shrink-0">
           {detectedSkills.length === 0 ? (
-            <div className="text-sm text-text-tertiary py-2">暂无 Skill</div>
+            <div className="text-sm text-text-tertiary py-2">{t("project.noSkill")}</div>
           ) : (
             <div className="flex flex-col gap-2">
               {detectedSkills.map((skill) => (
@@ -272,21 +275,21 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       {/* Add Skill dialog */}
       <Dialog open={showAddSkill} onClose={() => setShowAddSkill(false)} width="w-[480px]">
         <div className="p-5 flex flex-col gap-4 overflow-y-auto">
-          <h3 className="text-sm font-normal text-text-primary shrink-0">添加 Skill 到项目</h3>
+          <h3 className="text-sm font-normal text-text-primary shrink-0">{t("project.addSkillTitle")}</h3>
 
           {/* Skill picker */}
           <div className="flex flex-col min-h-0">
-            <label className="text-xs font-normal text-text-secondary mb-1.5">选择 Skill</label>
+            <label className="text-xs font-normal text-text-secondary mb-1.5">{t("project.selectSkill")}</label>
             <Input
               value={addSearch}
               onChange={(e) => setAddSearch(e.target.value)}
-              placeholder="搜索..."
+              placeholder={t("common.search")}
               autoFocus
               className="mb-2"
             />
             <div className="overflow-y-auto border border-border-subtle rounded-md min-h-[120px] max-h-[200px]">
               {filteredAddSkills.length === 0 ? (
-                <div className="p-3 text-xs text-text-tertiary">无匹配 Skill</div>
+                <div className="p-3 text-xs text-text-tertiary">{t("project.noMatchedSkill")}</div>
               ) : (
                 filteredAddSkills.map((s) => (
                   <button
@@ -310,7 +313,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
 
           {/* Tool selector */}
           <div>
-            <label className="text-xs font-normal text-text-secondary mb-1.5 block">分发到工具路径</label>
+            <label className="text-xs font-normal text-text-secondary mb-1.5 block">{t("project.distributeToToolPath")}</label>
             <div className="flex flex-wrap gap-3">
               {TOOLS.map((tool) => (
                 <label key={tool} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
@@ -332,14 +335,14 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
           </div>
 
           <div className="flex justify-end gap-2 shrink-0">
-            <Button variant="secondary" size="sm" onClick={() => setShowAddSkill(false)}>取消</Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowAddSkill(false)}>{t("common.cancel")}</Button>
             <Button
               variant="primary"
               size="sm"
               onClick={handleAddSkill}
               disabled={!addSelectedSkillId || addSelectedTools.size === 0 || addLoading}
             >
-              {addLoading ? "分发中..." : "分发"}
+              {addLoading ? t("common.distributing") : t("common.distribute")}
             </Button>
           </div>
         </div>
@@ -348,10 +351,10 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
       {/* Delete confirmation dialog */}
       <Dialog open={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteError(null); }}>
         <div className="p-6 flex flex-col gap-4">
-          <h3 className="text-[14px] font-normal text-text-primary">删除项目</h3>
+          <h3 className="text-[14px] font-normal text-text-primary">{t("project.deleteTitle")}</h3>
           <p className="text-[13px] text-text-secondary">
-            确认删除项目「{project.name}」？<br />
-            <span className="text-text-tertiary">不会删除本地文件夹，仅从 Kitestring 中移除记录。</span>
+            {t("project.deleteConfirm", { name: project.name })}<br />
+            <span className="text-text-tertiary">{t("project.deleteKeepsFolder")}</span>
           </p>
           {deleteError && <p className="text-xs text-status-broken">{deleteError}</p>}
           <div className="flex gap-2 justify-end">
@@ -361,7 +364,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
               onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
               disabled={deleting}
             >
-              取消
+              {t("common.cancel")}
             </Button>
             <Button
               variant="ghost"
@@ -370,7 +373,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
               onClick={handleDeleteProject}
               disabled={deleting}
             >
-              {deleting ? "删除中…" : "确认删除"}
+              {deleting ? t("common.deleting") : t("project.confirmDelete")}
             </Button>
           </div>
         </div>

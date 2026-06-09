@@ -8,6 +8,8 @@ import CreateProjectDialog from "../project/CreateProjectDialog";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { useI18n } from "../../i18n/I18nProvider";
+import { translateError } from "../../i18n/errors";
 
 interface SidebarProps {
   selectedSkill: Skill | null;
@@ -22,6 +24,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp, controlledImportOpen, controlledImportTab, onControlledImportClose }: SidebarProps) {
+  const { locale, t } = useI18n();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [query, setQuery] = useState("");
@@ -37,7 +40,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   // Grouping dialog
   const [pendingGroupSkills, setPendingGroupSkills] = useState<Skill[]>([]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
-  const [groupName, setGroupName] = useState("未命名");
+  const [groupName, setGroupName] = useState(t("group.defaultName"));
   // Create group
   const [serverGroups, setServerGroups] = useState<string[]>([]);
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
@@ -114,7 +117,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       if (existing) onSelectSkill(existing);
       await loadData();
     } catch (e) {
-      setError(String(e));
+      setError(translateError(e, locale));
     }
     openNextConflict(pendingConflicts);
   }
@@ -127,7 +130,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       setSkills((prev) => [...prev, newSkill]);
       await loadData();
     } catch (e) {
-      setError(String(e));
+      setError(translateError(e, locale));
     }
     openNextConflict(pendingConflicts);
   }
@@ -176,7 +179,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
     try {
       const newSkills = await tauri.importLocalSkill(importLocalPath);
       if (newSkills.length === 0) {
-        setError("未找到 SKILL.md，该文件夹可能不包含有效 Skill");
+        setError(t("import.localNoSkill"));
       } else {
         setSkills((prev) => {
           const existingIds = new Set(prev.map((s) => s.id));
@@ -185,19 +188,19 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         closeImportDialog();
         if (newSkills.length > 1) {
           setPendingGroupSkills(newSkills);
-          setGroupName("未命名");
+          setGroupName(t("group.defaultName"));
           setShowGroupDialog(true);
         }
       }
     } catch (e) {
-      setError(String(e));
+      setError(translateError(e, locale));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleConfirmGroup() {
-    await Promise.all(pendingGroupSkills.map((s) => tauri.setSkillGroup(s.id, groupName.trim() || "未命名")));
+    await Promise.all(pendingGroupSkills.map((s) => tauri.setSkillGroup(s.id, groupName.trim() || t("group.defaultName"))));
     setShowGroupDialog(false);
     await loadData();
   }
@@ -262,7 +265,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       const result = await tauri.importGithubSkill(importUrl.trim());
       const { imported, conflicts } = result;
       if (imported.length === 0 && conflicts.length === 0) {
-        setError("未在仓库中找到 SKILL.md");
+        setError(t("import.githubNoSkill"));
       } else {
         if (imported.length > 0) {
           setSkills((prev) => {
@@ -276,7 +279,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         }
       }
     } catch (e) {
-      setError(String(e));
+      setError(translateError(e, locale));
     } finally {
       setLoading(false);
     }
@@ -328,7 +331,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         >
           Kitestring
         </div>
-        <div className="text-xs text-text-tertiary mt-0.5">AI 技能管理器</div>
+        <div className="text-xs text-text-tertiary mt-0.5">{t("app.subtitle")}</div>
       </div>
 
       {/* Tabs */}
@@ -347,7 +350,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 : "border-transparent text-text-tertiary hover:text-text-secondary"
             }`}
           >
-            {tab === "skills" ? "Skills" : "Projects"}
+            {tab === "skills" ? t("sidebar.tab.skills") : t("sidebar.tab.projects")}
           </button>
         ))}
       </div>
@@ -370,13 +373,13 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="搜索 Skills..."
+                  placeholder={t("sidebar.searchSkills")}
                   className="w-full text-xs pl-6 pr-2 py-1 rounded-sm bg-bg-elevated border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary"
                 />
               </div>
               <button
                 onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
-                title="创建分组"
+                title={t("sidebar.createGroup")}
                 className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors shrink-0"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -405,7 +408,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     <button
                       onClick={() => toggleGroupCollapse(groupLabel)}
                       className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors"
-                      title={isGroupCollapsed ? "展开分组" : "折叠分组"}
+                      title={isGroupCollapsed ? t("sidebar.expandGroup") : t("sidebar.collapseGroup")}
                     >
                       <svg className={`w-2.5 h-2.5 transition-transform ${isGroupCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -418,12 +421,12 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     {!isOver && (
                       <span className="ml-auto text-[9px] normal-case font-normal opacity-60 shrink-0">{groupSkills.length}</span>
                     )}
-                    {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
+                    {isOver && <span className="ml-auto text-[9px] normal-case font-normal">{t("sidebar.dragIntoGroup")}</span>}
                     {!isOver && groupSkills.length === 0 && (
                       <button
                         onClick={() => handleDeleteGroup(groupLabel)}
                         className="text-text-tertiary hover:text-status-broken transition-colors"
-                        title="删除空分组"
+                        title={t("sidebar.deleteEmptyGroup")}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -455,13 +458,13 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
 
             {!hasSkills && (
               <div className="px-5 py-4 text-xs text-text-tertiary">
-                暂无 Skill，先导入一个技能
+                {t("sidebar.noSkills")}
               </div>
             )}
             {hasSkills && filteredSkills.length === 0 && query && (
               <div className="px-5 py-3 text-xs text-text-tertiary leading-relaxed">
-                <div>没有匹配的结果</div>
-                <div className="text-[10px] mt-0.5">尝试更换关键词</div>
+                <div>{t("sidebar.noResults")}</div>
+                <div className="text-[10px] mt-0.5">{t("sidebar.tryOtherKeyword")}</div>
               </div>
             )}
           </>
@@ -469,7 +472,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           <>
             {projects.length === 0 ? (
               <div className="px-5 py-4 text-xs text-text-tertiary">
-                点击下方「+ 导入项目」开始
+                {t("sidebar.projectEmptyHint")}
               </div>
             ) : (
               projects.map((project) => {
@@ -504,7 +507,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
               d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          设置
+          {t("sidebar.settings")}
         </button>
         {activeTab === "skills" ? (
           <button
@@ -515,14 +518,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             }}
             className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
           >
-            + 导入 Skill
+            {t("sidebar.importSkillButton")}
           </button>
         ) : (
           <button
             onClick={() => setShowCreateProject(true)}
             className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
           >
-            + 导入项目
+            {t("sidebar.importProjectButton")}
           </button>
         )}
       </div>
@@ -538,7 +541,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             <div className="w-8 h-1 rounded-full animate-[brand-breathe_6s_ease-in-out_infinite]" style={{ background: "var(--gradient-skyline)" }} />
             <button
               onClick={() => setOverlayOpen(true)}
-              title="展开侧边栏"
+              title={t("sidebar.openSidebar")}
               className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -548,7 +551,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             <div className="mt-auto">
               <button
                 onClick={() => setShowSettings(true)}
-                title="设置"
+                title={t("sidebar.settings")}
                 className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -582,7 +585,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       <Dialog open={showImportDialog || !!controlledImportOpen} onClose={closeImportDialog} width="w-[480px]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
-          <h3 className="text-sm font-normal text-text-primary">导入 Skill</h3>
+          <h3 className="text-sm font-normal text-text-primary">{t("import.title")}</h3>
           <Button variant="icon" onClick={closeImportDialog}>×</Button>
         </div>
 
@@ -601,7 +604,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                   : "border-transparent text-text-tertiary hover:text-text-secondary"
               }`}
             >
-              {tab === "local" ? "本地文件夹" : "GitHub 仓库"}
+              {tab === "local" ? t("import.localTab") : t("import.githubTab")}
             </button>
           ))}
         </div>
@@ -611,20 +614,20 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           {importTab === "local" ? (
             <>
               <div>
-                <label className="block text-xs font-normal text-text-secondary mb-1">文件夹路径</label>
+                <label className="block text-xs font-normal text-text-secondary mb-1">{t("import.folderPath")}</label>
                 <div className="flex gap-2">
                   <Input
                     mono
                     value={importLocalPath}
                     readOnly
-                    placeholder="选择文件夹..."
+                    placeholder={t("import.selectFolderPlaceholder")}
                     className="flex-1"
                   />
                   <Button variant="secondary" size="sm" onClick={handleSelectFolder}>
-                    选择文件夹
+                    {t("import.selectFolder")}
                   </Button>
                 </div>
-                <p className="text-[10px] text-text-tertiary mt-1">Skill 文件夹需包含 SKILL.md 文件</p>
+                <p className="text-[10px] text-text-tertiary mt-1">{t("import.skillFolderHint")}</p>
               </div>
               {error && (
                 <div className="text-xs text-status-broken px-3 py-2 rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}>
@@ -635,7 +638,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           ) : (
             <>
               <div>
-                <label className="block text-xs font-normal text-text-secondary mb-1">仓库地址</label>
+                <label className="block text-xs font-normal text-text-secondary mb-1">{t("import.repoUrl")}</label>
                 <Input
                   type="text"
                   value={importUrl}
@@ -657,14 +660,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle shrink-0">
-          <Button variant="secondary" size="sm" onClick={closeImportDialog}>返回</Button>
+          <Button variant="secondary" size="sm" onClick={closeImportDialog}>{t("common.back")}</Button>
           <Button
             variant="primary"
             size="sm"
             onClick={importTab === "local" ? handleLocalImportConfirm : handleGithubImport}
             disabled={loading || (importTab === "local" && !importLocalPath)}
           >
-            {loading ? "导入中..." : "导入"}
+            {loading ? t("common.importing") : t("common.import")}
           </Button>
         </div>
       </Dialog>
@@ -688,27 +691,27 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
             width="w-80"
           >
             <div className="px-5 py-4 border-b border-border-subtle">
-              <h3 className="text-sm font-normal text-text-primary">创建分组</h3>
+              <h3 className="text-sm font-normal text-text-primary">{t("group.createTitle")}</h3>
             </div>
             <div className="px-5 py-4 space-y-4 overflow-y-auto">
               <div>
-                <label className="block text-xs font-normal text-text-secondary mb-1">分组名称</label>
+                <label className="block text-xs font-normal text-text-secondary mb-1">{t("group.name")}</label>
                 <Input
                   type="text"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="未命名"
+                  placeholder={t("group.defaultName")}
                   autoFocus
                 />
               </div>
               <div>
                 <div className="flex items-baseline justify-between mb-1.5">
                   <label className="text-xs font-normal text-text-secondary">
-                    选择 Skills
-                    <span className="ml-1 font-normal text-text-tertiary">（至少选一个）</span>
+                    {t("group.selectSkills")}
+                    <span className="ml-1 font-normal text-text-tertiary">{t("group.selectAtLeastOne")}</span>
                   </label>
                   {newGroupSelectedSkills.size > 0 && (
-                    <span className="text-[10px] text-accent-sky">{newGroupSelectedSkills.size} 已选</span>
+                    <span className="text-[10px] text-accent-sky">{t("group.selectedCount", { count: newGroupSelectedSkills.size })}</span>
                   )}
                 </div>
                 <div className="relative mb-1.5">
@@ -719,7 +722,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     type="text"
                     value={newGroupSearch}
                     onChange={(e) => setNewGroupSearch(e.target.value)}
-                    placeholder="搜索 Skills..."
+                    placeholder={t("sidebar.searchSkills")}
                     className="w-full text-xs pl-6 pr-2 py-1.5 rounded-sm border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary bg-bg-elevated"
                   />
                   {newGroupSearch && (
@@ -756,10 +759,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                     </label>
                   ))}
                   {candidateSkills.length === 0 && (
-                    <div className="px-3 py-3 text-xs text-text-tertiary">暂无未分组的 Skills</div>
+                    <div className="px-3 py-3 text-xs text-text-tertiary">{t("group.noUngrouped")}</div>
                   )}
                   {candidateSkills.length > 0 && visibleSkills.length === 0 && lowerSearch && (
-                    <div className="px-3 py-3 text-xs text-text-tertiary">没有匹配「{newGroupSearch}」的 Skill</div>
+                    <div className="px-3 py-3 text-xs text-text-tertiary">{t("group.noSearchResult", { query: newGroupSearch })}</div>
                   )}
                 </div>
               </div>
@@ -770,7 +773,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 size="sm"
                 onClick={() => { setShowCreateGroupDialog(false); setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); }}
               >
-                取消
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -778,7 +781,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 onClick={handleCreateGroup}
                 disabled={!newGroupName.trim() || newGroupSelectedSkills.size === 0}
               >
-                创建
+                {t("common.create")}
               </Button>
             </div>
           </Dialog>
@@ -788,12 +791,12 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       {/* Grouping dialog */}
       <Dialog open={showGroupDialog} onClose={() => setShowGroupDialog(false)} width="w-80">
         <div className="p-6 flex flex-col gap-4">
-          <h3 className="text-[14px] font-normal text-text-primary">将 Skills 分组</h3>
+          <h3 className="text-[14px] font-normal text-text-primary">{t("group.groupSkillsTitle")}</h3>
           <p className="text-[13px] text-text-secondary">
-            检测到 <span className="font-medium">{pendingGroupSkills.length}</span> 个 Skills，是否将其归为一组？
+            {t("group.groupPrompt", { count: pendingGroupSkills.length })}
           </p>
           <div>
-            <label className="block text-xs font-normal text-text-secondary mb-1">组名</label>
+            <label className="block text-xs font-normal text-text-secondary mb-1">{t("group.nameLabel")}</label>
             <Input
               type="text"
               value={groupName}
@@ -804,10 +807,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowGroupDialog(false)}>
-              不分组
+              {t("group.doNotGroup")}
             </Button>
             <Button variant="primary" size="sm" onClick={handleConfirmGroup}>
-              确认分组
+              {t("group.confirm")}
             </Button>
           </div>
         </div>
@@ -817,24 +820,23 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       <Dialog open={showConflictDialog && !!currentConflict} onClose={handleConflictSkip} width="w-96">
         {currentConflict && (
           <div className="p-6 flex flex-col gap-4">
-            <h3 className="text-[14px] font-normal text-text-primary">Skill 已存在</h3>
+            <h3 className="text-[14px] font-normal text-text-primary">{t("conflict.title")}</h3>
             <div className="flex flex-col gap-1">
               <p className="text-[13px] text-text-secondary">
-                「{currentConflict.skill_name}」
                 {currentConflict.has_git
-                  ? " 已存在，且包含 Git 仓库，要拉取最新版本吗？"
-                  : " 已存在（无 Git 仓库），要创建为新 Skill 吗？"}
+                  ? t("conflict.pullMessage", { name: currentConflict.skill_name })
+                  : t("conflict.createMessage", { name: currentConflict.skill_name })}
               </p>
               {pendingConflicts.length > 0 && (
-                <p className="text-xs text-text-tertiary">还有 {pendingConflicts.length} 个冲突待处理</p>
+                <p className="text-xs text-text-tertiary">{t("conflict.remaining", { count: pendingConflicts.length })}</p>
               )}
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={handleConflictSkip}>跳过</Button>
+              <Button variant="ghost" size="sm" onClick={handleConflictSkip}>{t("common.skip")}</Button>
               {currentConflict.has_git ? (
-                <Button variant="primary" size="sm" onClick={handleConflictPull}>拉取更新</Button>
+                <Button variant="primary" size="sm" onClick={handleConflictPull}>{t("conflict.pull")}</Button>
               ) : (
-                <Button variant="primary" size="sm" onClick={handleConflictCreate}>创建新 Skill</Button>
+                <Button variant="primary" size="sm" onClick={handleConflictCreate}>{t("conflict.createNew")}</Button>
               )}
             </div>
           </div>
@@ -871,12 +873,13 @@ function SkillItem({
   onSelect: () => void;
   indent?: boolean;
 }) {
+  const { t } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
 
   function getSourceLabel(): string {
     if (skill.source_type === "Github") return "GitHub";
-    if (skill.has_git) return "本地 · GitHub";
-    return "本地";
+    if (skill.has_git) return t("sidebar.sourceLocalGithub");
+    return t("common.local");
   }
 
   return (

@@ -9,6 +9,8 @@ import { Dialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Tag } from "../ui/Tag";
 import { useToast } from "../ui/Toast";
+import { useI18n } from "../../i18n/I18nProvider";
+import { translateError } from "../../i18n/errors";
 
 
 interface DetailPanelProps {
@@ -40,6 +42,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
   const [keepSymlinks, setKeepSymlinks] = useState(false);
 
   const { showToast } = useToast();
+  const { locale, t } = useI18n();
 
   useEffect(() => {
     tauri.getAppConfig().then(setAppConfig).catch(console.error);
@@ -79,7 +82,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       await tauri.deleteSkill(skill.id, keepSymlinks);
       onSkillDeleted(skill.id);
     } catch (e) {
-      setActionError(String(e));
+      setActionError(translateError(e, locale));
       setConfirmDelete(false);
     } finally {
       setDeleting(false);
@@ -94,9 +97,9 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       const result = await tauri.pullGithubSkill(skill.id);
       onSkillPulled();
       setDetailReloadKey((k) => k + 1);
-      showToast(result.updated ? "更新成功" : "当前版本已是最新");
+      showToast(result.updated ? t("toast.pullUpdated") : t("toast.pullUpToDate"));
     } catch (e) {
-      setActionError(String(e));
+      setActionError(translateError(e, locale));
     } finally {
       setPulling(false);
     }
@@ -123,76 +126,76 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                   <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
                 </svg>
                 <p style={{ fontFamily: "var(--font-serif)", fontSize: "24px", fontWeight: 500, color: "var(--text-primary)" }}>
-                  开始编织你的 Skill 网络
+                  {t("onboarding.title")}
                 </p>
               </div>
               <p className="text-[13px] text-text-secondary">
-                支持 Git 版本追踪 • symlink 链接分发 • Claude / Copilot / Gemini / Codex / Agent
+                {t("onboarding.subtitle")}
               </p>
             </div>
 
             {/* skill import */}
             <div className="flex flex-col gap-3">
               <p style={{ fontFamily: "var(--font-serif)", fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>
-                导入 Skill
+                {t("onboarding.importTitle")}
               </p>
 
               <div className="flex flex-col gap-3">
                 <p className="text-[14px] text-text-primary" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
-                  创建 Skill 实例。适用于全局型的 Skill，创建实例后可以分发至任意路径：
+                  {t("onboarding.importIntro")}
                 </p>
 
                 {/* 方式 1：检索工具路径 */}
                 <div className="flex flex-col gap-1">
-                  <p className="text-[13px] text-text-secondary">从 Claude/Copilot/Gemini/Codex/Agent 的默认用户路径中检索已存在的 skills 并导入：</p>
+                  <p className="text-[13px] text-text-secondary">{t("onboarding.discoverText")}</p>
                   <Button
                     variant="primary"
                     size="sm"
                     className="self-start"
                     onClick={onDiscover}
                   >
-                    检索工具默认用户路径并导入
+                    {t("onboarding.discoverButton")}
                   </Button>
                 </div>
 
                 {/* 方式 2：本地文件夹 */}
                 <div className="flex flex-col gap-1">
-                  <p className="text-[13px] text-text-secondary">选择本地文件夹并导入该文件夹包含的所有 skills：</p>
+                  <p className="text-[13px] text-text-secondary">{t("onboarding.localText")}</p>
                   <Button
                     variant="primary"
                     size="sm"
                     className="self-start"
                     onClick={() => onImport?.("local")}
                   >
-                    选择本地文件夹并导入
+                    {t("onboarding.localButton")}
                   </Button>
                 </div>
 
                 {/* 方式 3：GitHub */}
                 <div className="flex flex-col gap-1">
-                  <p className="text-[13px] text-text-secondary">从 GitHub 导入：</p>
+                  <p className="text-[13px] text-text-secondary">{t("onboarding.githubText")}</p>
                   <Button
                     variant="primary"
                     size="sm"
                     className="self-start"
                     onClick={() => onImport?.("github")}
                   >
-                    输入 GitHub 链接并导入
+                    {t("onboarding.githubButton")}
                   </Button>
                 </div>
 
                 <div className="flex flex-col gap-1 pt-4">
                   <p className="text-[14px] text-text-primary" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
-                    创建项目。适用于多工具同时使用的场景，支持将同一 Skill 分发至多个工具：
+                    {t("onboarding.projectIntro")}
                   </p>
-                  <p className="text-[13px] text-text-secondary">选择本地文件夹并导入，同时创建项目，以项目维度管理：</p>
+                  <p className="text-[13px] text-text-secondary">{t("onboarding.projectText")}</p>
                   <Button
                     variant="primary"
                     size="sm"
                     className="self-start"
                     onClick={onCreateProject}
                   >
-                    选择本地文件夹并导入，同时创建项目
+                    {t("onboarding.projectButton")}
                   </Button>
                 </div>
               </div>
@@ -201,10 +204,10 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             {/* skill export */}
             <div className="flex flex-col gap-3">
               <p style={{ fontFamily: "var(--font-serif)", fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>
-                分发 Skill
+                {t("onboarding.distributeTitle")}
               </p>
               <p className="text-[13px] text-text-secondary">
-                成功导入 Skill 后，即可在 Skill 或项目详情页创建指向 Skill 的 symlink。
+                {t("onboarding.distributeText")}
               </p>
             </div>
           </div>
@@ -226,7 +229,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
           <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
         </svg>
         <p style={{ fontFamily: "var(--font-serif)", fontSize: "16px" }}>
-          选择一个 Skill 查看详情
+          {t("detail.selectSkill")}
         </p>
       </main>
     );
@@ -346,7 +349,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       const dist = await tauri.distributeSkill(skill.id, tool, scope);
       setDistributions((prev) => [...prev, dist]);
     } catch (e) {
-      setDistError(String(e));
+      setDistError(translateError(e, locale));
     }
   }
 
@@ -359,7 +362,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       setAddingPathTool(null);
       setCustomPathInput("");
     } catch (e) {
-      setDistError(String(e));
+      setDistError(translateError(e, locale));
     }
   }
 
@@ -379,12 +382,12 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       {/* Delete confirmation dialog */}
       <Dialog open={confirmDelete} onClose={() => { setConfirmDelete(false); setActionError(null); }}>
         <div className="p-6">
-          <h3 className="text-[14px] font-normal text-text-primary mb-2">删除技能</h3>
+          <h3 className="text-[14px] font-normal text-text-primary mb-2">{t("detail.deleteSkill")}</h3>
           <p className="text-[13px] text-text-secondary mb-1">
-            确认从 Kitestring 中移除「{skill.name}」？
+            {t("detail.deleteConfirm", { name: skill.name })}
           </p>
           <p className="text-[13px] text-text-tertiary mb-4">
-            不会删除本地文件夹。
+            {t("detail.deleteKeepsFolder")}
           </p>
           {actionError && (
             <div className="mb-3 text-xs px-3 py-1.5 rounded-md" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>{actionError}</div>
@@ -399,7 +402,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                 className="w-full justify-start"
                 danger
               >
-                {deleting ? "删除中..." : `删除并清理 symlink（${distributions.filter((d) => d.entry_type === "Symlink").length} 个）`}
+                {deleting ? t("common.deleting") : t("detail.deleteAndClean", { count: distributions.filter((d) => d.entry_type === "Symlink").length })}
               </Button>
             )}
             <Button
@@ -409,7 +412,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
               disabled={deleting}
               className="w-full justify-start"
             >
-              {deleting ? "删除中..." : "仅删除记录（保留 symlink）"}
+              {deleting ? t("common.deleting") : t("detail.deleteRecordOnly")}
             </Button>
             <Button
               variant="ghost"
@@ -417,7 +420,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
               onClick={() => { setConfirmDelete(false); setActionError(null); }}
               className="w-full justify-center"
             >
-              取消
+              {t("common.cancel")}
             </Button>
           </div>
         </div>
@@ -438,7 +441,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                 <Tag variant="sky" size="md">GitHub</Tag>
               ) : (
                 <>
-                  <Tag variant="earth" size="md">本地</Tag>
+                  <Tag variant="earth" size="md">{t("common.local")}</Tag>
                   {skill.has_git && <Tag variant="sky" size="md">GitHub</Tag>}
                 </>
               )}
@@ -452,7 +455,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
         {/* Path + Git info */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-semibold text-text-tertiary shrink-0">路径</span>
+            <span className="text-[10px] font-semibold text-text-tertiary shrink-0">{t("common.path")}</span>
             <span className="text-[10px] text-text-secondary font-mono truncate">{skill.source_path}</span>
           </div>
           {gitInfo?.is_git_repo && (
@@ -461,7 +464,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
               <span className="text-[10px] text-text-secondary">
                 {gitInfo.branch}
                 {gitInfo.commit_count ? ` · ${gitInfo.commit_count} commits` : ""}
-                {gitInfo.last_commit_time ? ` · 更新于 ${gitInfo.last_commit_time.slice(0, 10)}` : ""}
+                {gitInfo.last_commit_time ? ` · ${t("detail.updatedAt", { date: gitInfo.last_commit_time.slice(0, 10) })}` : ""}
               </span>
             </div>
           )}
@@ -471,7 +474,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
         <div className="flex gap-3">
           {canPull && (
             <Button variant="secondary" size="sm" onClick={handlePull} disabled={pulling}>
-              {pulling ? "拉取中..." : "拉取更新"}
+              {pulling ? t("detail.pulling") : t("detail.pullUpdate")}
             </Button>
           )}
           <Button
@@ -480,14 +483,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
             danger
           >
-            删除
+            {t("common.delete")}
           </Button>
         </div>
       </div>
 
       {/* Tools section */}
       <div className="flex flex-col gap-2">
-        <p className="text-[11px] font-semibold text-text-primary">工具</p>
+        <p className="text-[11px] font-semibold text-text-primary">{t("common.tools")}</p>
         {distError && (
           <div className="text-xs px-3 py-1.5 rounded-md" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>
             {distError}
@@ -516,7 +519,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                       setCustomPathInput("");
                       setDistError(null);
                     }}
-                    title="添加自定义路径"
+                    title={t("detail.addCustomPath")}
                   >
                     +
                   </Button>
@@ -527,7 +530,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                   {/* Global path row */}
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={isFileSource(tool) ? { backgroundColor: "var(--status-linked)" } : statusStyle(globalDist?.status ?? "none")} />
-                    <Tag variant="default" size="xs">用户级</Tag>
+                    <Tag variant="default" size="xs">{t("common.userLevel")}</Tag>
                     <div className="flex-1 min-w-0">
                       <div className="text-[10px] text-text-primary truncate">{globalFolderName}</div>
                       <div className="text-[10px] text-text-tertiary truncate" title={globalGrandparentPath}>
@@ -535,11 +538,11 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                       </div>
                     </div>
                     {isFileSource(tool) ? (
-                      <Tag variant="default" size="sm">文件来源</Tag>
+                      <Tag variant="default" size="sm">{t("detail.fileSource")}</Tag>
                     ) : globalDist ? (
-                      <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="shrink-0">取消</Button>
+                      <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="shrink-0">{t("common.cancel")}</Button>
                     ) : (
-                      <Button variant="primary" size="sm" onClick={() => handleDistribute(tool, "Global")} className="shrink-0">分发</Button>
+                      <Button variant="primary" size="sm" onClick={() => handleDistribute(tool, "Global")} className="shrink-0">{t("common.distribute")}</Button>
                     )}
                   </div>
 
@@ -550,7 +553,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div key={eg.path} className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(egIsFileSource ? "Linked" : egDist?.status ?? "none")} />
-                        <Tag variant="default" size="xs">用户级</Tag>
+                        <Tag variant="default" size="xs">{t("common.userLevel")}</Tag>
                         <div className="flex-1 min-w-0">
                           <div className="text-[10px] text-text-primary truncate">{eg.folderName}/*/skills</div>
                           <div className="text-[10px] text-text-tertiary truncate" title={eg.parentPath}>
@@ -558,11 +561,11 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                           </div>
                         </div>
                         {egIsFileSource ? (
-                          <Tag variant="default" size="sm">文件来源</Tag>
+                          <Tag variant="default" size="sm">{t("detail.fileSource")}</Tag>
                         ) : egDist ? (
-                          <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="shrink-0">取消</Button>
+                          <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="shrink-0">{t("common.cancel")}</Button>
                         ) : (
-                          <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, eg.path)} className="shrink-0">分发</Button>
+                          <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, eg.path)} className="shrink-0">{t("common.distribute")}</Button>
                         )}
                       </div>
                     );
@@ -576,14 +579,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "var(--status-linked)" }} />
-                        <Tag variant="default" size="xs">项目级</Tag>
+                        <Tag variant="default" size="xs">{t("common.projectLevel")}</Tag>
                         <div className="flex-1 min-w-0">
                           <div className="text-[10px] text-text-primary truncate">{folderName}</div>
                           <div className="text-[10px] text-text-tertiary truncate" title={parentPath}>
                             {parentPath}
                           </div>
                         </div>
-                        <Tag variant="default" size="sm">文件来源</Tag>
+                        <Tag variant="default" size="sm">{t("detail.fileSource")}</Tag>
                       </div>
                     );
                   })()}
@@ -596,14 +599,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                     return (
                       <div key={dist.id} className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(dist.status)} />
-                        <Tag variant="default" size="xs">项目级</Tag>
+                        <Tag variant="default" size="xs">{t("common.projectLevel")}</Tag>
                         <div className="flex-1 min-w-0">
                           <div className="text-[10px] text-text-primary truncate">{containerName}</div>
                           <div className="text-[10px] text-text-tertiary truncate" title={grandparentPath}>
                             {grandparentPath}
                           </div>
                         </div>
-                        <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(dist.id)} className="shrink-0">取消</Button>
+                        <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(dist.id)} className="shrink-0">{t("common.cancel")}</Button>
                       </div>
                     );
                   })}
@@ -623,8 +626,8 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
                         }}
                       />
                       <div className="flex gap-1.5">
-                        <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, customPathInput)} className="flex-1">确认</Button>
-                        <Button variant="ghost" size="sm" onClick={() => { setAddingPathTool(null); setCustomPathInput(""); }}>取消</Button>
+                        <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, customPathInput)} className="flex-1">{t("common.confirm")}</Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setAddingPathTool(null); setCustomPathInput(""); }}>{t("common.cancel")}</Button>
                       </div>
                     </div>
                   )}
@@ -637,7 +640,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
 
       {/* Files section */}
       <div className="flex flex-col gap-2 shrink-0">
-        <p className="text-[11px] font-semibold text-text-primary">文件</p>
+        <p className="text-[11px] font-semibold text-text-primary">{t("detail.files")}</p>
         <div className="rounded-lg bg-bg-elevated p-2 w-full max-w-[260px]">
           {files.length > 0 ? (
             <FileTree
@@ -646,7 +649,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
               selectedPath={undefined}
             />
           ) : (
-            <div className="py-1 px-2 text-[11px] text-text-tertiary">加载中...</div>
+            <div className="py-1 px-2 text-[11px] text-text-tertiary">{t("common.loading")}</div>
           )}
         </div>
       </div>

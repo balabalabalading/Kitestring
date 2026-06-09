@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Skill, Distribution } from "../../types";
 import { TOOL_DISPLAY_NAMES } from "../../types";
 import { Tag } from "../ui/Tag";
+import { useI18n } from "../../i18n/I18nProvider";
 
 type Tool = "ClaudeCode" | "CopilotCLI" | "GeminiCLI" | "Codex" | "AgentFolder";
 type CellType = "linked" | "broken" | "pending" | "folder" | "none" | "disabled";
@@ -42,6 +43,7 @@ function ThreeDots() {
 export default function DistributionMatrix({
   skills, tools, allDists, getToolProjectPath, onDistribute, onRemoveDist, onSelectSkill,
 }: Props) {
+  const { t } = useI18n();
   const [openPopover, setOpenPopover] = useState<Tool | null>(null);
   const [busyTool, setBusyTool] = useState<Tool | null>(null);
 
@@ -106,7 +108,7 @@ export default function DistributionMatrix({
   }
 
   if (skills.length === 0) {
-    return <div className="text-sm text-text-tertiary py-4">暂无 Skill</div>;
+    return <div className="text-sm text-text-tertiary py-4">{t("matrix.noSkill")}</div>;
   }
 
   return (
@@ -120,7 +122,7 @@ export default function DistributionMatrix({
         {/* Header row */}
         <div className="flex h-[32px] bg-bg-elevated rounded-t-[6px]">
           <div className="w-[276px] shrink-0 flex items-center px-2">
-            <span className="text-[10px] font-semibold text-text-tertiary">技能名称</span>
+            <span className="text-[10px] font-semibold text-text-tertiary">{t("matrix.skillName")}</span>
           </div>
           {tools.map((tool) => (
             <div key={tool} className="w-[140px] shrink-0 relative flex items-center px-2">
@@ -144,14 +146,14 @@ export default function DistributionMatrix({
                     disabled={busyTool !== null}
                     onClick={(e) => { e.stopPropagation(); void handleDistributeAll(tool); }}
                   >
-                    {busyTool === tool ? "处理中..." : "全部分发"}
+                    {busyTool === tool ? t("matrix.processing") : t("matrix.distributeAll")}
                   </button>
                   <button
                     className="w-full text-left px-3 py-1.5 text-[12px] text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors disabled:opacity-50"
                     disabled={busyTool !== null}
                     onClick={(e) => { e.stopPropagation(); void handleRemoveAll(tool); }}
                   >
-                    {busyTool === tool ? "处理中..." : "全部取消"}
+                    {busyTool === tool ? t("matrix.processing") : t("matrix.cancelAll")}
                   </button>
                 </div>
               )}
@@ -188,7 +190,7 @@ export default function DistributionMatrix({
                       <button
                         onClick={() => onDistribute(skill.id, tool)}
                         className="w-10 h-10 rounded-[6px] flex items-center justify-center hover:bg-bg-surface transition-colors"
-                        title={`分发到 ${TOOL_DISPLAY_NAMES[tool]}`}
+                        title={t("matrix.distributeTo", { tool: TOOL_DISPLAY_NAMES[tool] })}
                       >
                         <span className="text-[16px] text-text-tertiary leading-none select-none">+</span>
                       </button>
@@ -201,10 +203,10 @@ export default function DistributionMatrix({
                         }`}
                         style={dotStyle(type)}
                         title={
-                          type === "folder" ? `文件夹来源（${TOOL_DISPLAY_NAMES[tool]}）`
-                            : type === "linked" ? "已链接 · 点击取消"
-                            : type === "broken" ? "链接断开 · 点击取消"
-                            : "待处理"
+                          type === "folder" ? t("matrix.folderSource", { tool: TOOL_DISPLAY_NAMES[tool] })
+                            : type === "linked" ? t("matrix.linkedCancel")
+                            : type === "broken" ? t("matrix.brokenCancel")
+                            : t("matrix.pending")
                         }
                       />
                     )}

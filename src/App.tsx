@@ -7,10 +7,13 @@ import type { Skill, Project } from "./types";
 import * as tauri from "./lib/tauri";
 import { useTheme } from "./hooks/useTheme";
 import { ToastProvider, useToast } from "./components/ui/Toast";
+import { I18nProvider, useI18n } from "./i18n/I18nProvider";
+import { translateError } from "./i18n/errors";
 
 function AppInner() {
   useTheme();
   const { showToast } = useToast();
+  const { locale, t } = useI18n();
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,15 +78,15 @@ function AppInner() {
     try {
       const skills = await tauri.discoverSkills();
       if (skills.length > 0) {
-        showToast(`发现并导入了 ${skills.length} 个 Skill`);
+        showToast(t("toast.discovered", { count: skills.length }));
         setRefreshKey((k) => k + 1);
       } else {
-        showToast("未发现新 Skill（已全部导入或路径中没有 SKILL.md）");
+        showToast(t("toast.noNewSkills"));
       }
     } catch (e) {
-      showToast(String(e), "error");
+      showToast(translateError(e, locale), "error");
     }
-  }, [showToast]);
+  }, [locale, showToast, t]);
 
   // Handle project created
   const handleProjectCreated = useCallback((project: Project) => {
@@ -91,8 +94,8 @@ function AppInner() {
     setRefreshKey((k) => k + 1);
     setSelectedProject(project);
     setSelectedSkill(null);
-    showToast(`项目「${project.name}」已创建`);
-  }, [showToast]);
+    showToast(t("toast.projectCreated", { name: project.name }));
+  }, [showToast, t]);
 
   return (
     <>
@@ -132,9 +135,11 @@ function AppInner() {
 
 function App() {
   return (
-    <ToastProvider>
-      <AppInner />
-    </ToastProvider>
+    <I18nProvider>
+      <ToastProvider>
+        <AppInner />
+      </ToastProvider>
+    </I18nProvider>
   );
 }
 

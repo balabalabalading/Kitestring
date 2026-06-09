@@ -1,10 +1,14 @@
+import { useI18n } from "../../i18n/I18nProvider";
+import type { TranslationKey } from "../../i18n/I18nProvider";
+
 interface SourceBadgeProps {
   type: "github" | "local";
 }
 
 function SourceBadge({ type }: SourceBadgeProps) {
+  const { t } = useI18n();
   const color = type === "github" ? "bg-accent-sky" : "bg-accent-earth";
-  const label = type === "github" ? "GitHub" : "本地";
+  const label = type === "github" ? t("common.github") : t("common.local");
   return (
     <span className="inline-flex items-center gap-1 text-[11px] text-text-tertiary">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
@@ -20,19 +24,20 @@ interface StatusBadgeProps {
   showText?: boolean;
 }
 
-const statusConfig: Record<StatusType, { color: string; label: string }> = {
-  linked: { color: "bg-status-linked", label: "已连接" },
-  pending: { color: "bg-status-pending", label: "等待中" },
-  broken: { color: "bg-status-broken", label: "已断开" },
-  none: { color: "bg-status-none", label: "未分发" },
+const statusConfig: Record<StatusType, { color: string; labelKey: TranslationKey }> = {
+  linked: { color: "bg-status-linked", labelKey: "badge.status.linked" },
+  pending: { color: "bg-status-pending", labelKey: "badge.status.pending" },
+  broken: { color: "bg-status-broken", labelKey: "badge.status.broken" },
+  none: { color: "bg-status-none", labelKey: "badge.status.none" },
 };
 
 function StatusBadge({ status, showText = false }: StatusBadgeProps) {
-  const { color, label } = statusConfig[status];
+  const { t } = useI18n();
+  const { color, labelKey } = statusConfig[status];
   return (
     <span className="inline-flex items-center gap-1">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
-      {showText && <span className="text-[11px] text-text-secondary">{label}</span>}
+      {showText && <span className="text-[11px] text-text-secondary">{t(labelKey)}</span>}
     </span>
   );
 }
