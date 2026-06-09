@@ -8,7 +8,7 @@ interface SourceBadgeProps {
 function SourceBadge({ type }: SourceBadgeProps) {
   const { t } = useI18n();
   const color = type === "github" ? "bg-accent-sky" : "bg-accent-earth";
-  const label = type === "github" ? "GitHub" : t("common.local");
+  const label = type === "github" ? t("common.github") : t("common.local");
   return (
     <span className="inline-flex items-center gap-1 text-[11px] text-text-tertiary">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />

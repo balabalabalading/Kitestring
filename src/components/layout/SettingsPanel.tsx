@@ -44,7 +44,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
   const [ignoredPaths, setIgnoredPaths] = useState<string[]>([]);
   const [newIgnoredPath, setNewIgnoredPath] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [rawError, setRawError] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [keepSymlinksOnClear, setKeepSymlinksOnClear] = useState(false);
@@ -59,7 +59,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       setIgnoredPaths(config.ignored_paths ?? []);
       setLoading(false);
     }).catch((e) => {
-      setError(translateError(e, locale));
+      setRawError(String(e));
       setLoading(false);
     });
   }, []);
@@ -72,7 +72,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       return;
     }
     const timer = window.setTimeout(() => {
-      tauri.updateToolPaths(paths).catch((e) => setError(translateError(e, locale)));
+      tauri.updateToolPaths(paths).catch((e) => setRawError(String(e)));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [paths, loading]);
@@ -84,7 +84,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       didLoadIgnoredPathsRef.current = true;
       return;
     }
-    tauri.updateIgnoredPaths(ignoredPaths).catch((e) => setError(translateError(e, locale)));
+    tauri.updateIgnoredPaths(ignoredPaths).catch((e) => setRawError(String(e)));
   }, [ignoredPaths, loading]);
 
   function updatePath(tool: string, field: "global" | "project", value: string) {
@@ -108,7 +108,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
   async function handleDiscover() {
     setDiscovering(true);
     setDiscoverResult(null);
-    setError(null);
+    setRawError(null);
     try {
       const skills = await tauri.discoverSkills();
       setDiscoverResult(skills.length > 0
@@ -117,7 +117,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       );
       if (skills.length > 0) onSkillsImported?.();
     } catch (e) {
-      setError(translateError(e, locale));
+      setRawError(String(e));
     } finally {
       setDiscovering(false);
     }
@@ -125,13 +125,13 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
 
   async function handleClearAll() {
     setClearing(true);
-    setError(null);
+    setRawError(null);
     try {
       await tauri.deleteAllSkills(keepSymlinksOnClear);
       setConfirmClear(false);
       onSkillsCleared?.();
     } catch (e) {
-      setError(translateError(e, locale));
+      setRawError(String(e));
     } finally {
       setClearing(false);
     }
@@ -183,7 +183,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
-              onClick={() => { setSettingsTab(item.id); setError(null); setDiscoverResult(null); }}
+              onClick={() => { setSettingsTab(item.id); setRawError(null); setDiscoverResult(null); }}
               className={`w-full flex items-center text-left pl-5 pr-4 h-9 text-[13px] transition-colors border-l-2 ${
                 settingsTab === item.id
                   ? "text-text-primary font-bold border-accent-sky"
@@ -391,12 +391,12 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
           )}
 
           {/* Feedback */}
-          {error && (
+          {rawError && (
             <div
               className="text-[11px] text-status-broken px-3 py-2 rounded-sm"
               style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}
             >
-              {error}
+              {translateError(rawError, locale)}
             </div>
           )}
         </div>

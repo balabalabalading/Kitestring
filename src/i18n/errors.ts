@@ -90,10 +90,12 @@ const ERROR_RULES: ErrorRule[] = [
 ];
 
 function fill(template: string, values: string[]) {
-  const names = ["path", "message"];
+  const replacements: Record<string, string | undefined> = {
+    path: values[0],
+    message: values.length === 1 ? values[0] : values[1],
+  };
   return template.replace(/\{(\w+)\}/g, (match, key) => {
-    const index = names.indexOf(key);
-    return index >= 0 && values[index] !== undefined ? values[index] : match;
+    return replacements[key] !== undefined ? replacements[key] : match;
   });
 }
 
@@ -112,4 +114,3 @@ export function translateError(error: unknown, locale: Locale): string {
   }
   return raw;
 }
-
