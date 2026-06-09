@@ -10,21 +10,17 @@ pub struct SkillMeta {
 
 /// Parse SKILL.md and extract front matter (name, description)
 pub fn parse_skill_md(path: &Path) -> Result<SkillMeta, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read SKILL.md: {e}"))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read SKILL.md: {e}"))?;
 
     let (front_matter, _body) = extract_front_matter(&content)?;
 
-    let name = front_matter
-        .get("name")
-        .cloned()
-        .unwrap_or_else(|| {
-            path.parent()
-                .and_then(|p| p.file_name())
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string()
-        });
+    let name = front_matter.get("name").cloned().unwrap_or_else(|| {
+        path.parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string()
+    });
 
     let description = front_matter.get("description").cloned().unwrap_or_default();
 
@@ -62,7 +58,9 @@ fn scan_for_skill_md(dir: &Path, results: &mut Vec<std::path::PathBuf>, depth: u
 
 /// Extract YAML-like front matter from markdown content.
 /// Supports simple `key: value` pairs and block scalars (`key: |` and `key: >`).
-fn extract_front_matter(content: &str) -> Result<(std::collections::HashMap<String, String>, String), String> {
+fn extract_front_matter(
+    content: &str,
+) -> Result<(std::collections::HashMap<String, String>, String), String> {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
         return Ok((std::collections::HashMap::new(), content.to_string()));
@@ -103,7 +101,10 @@ fn extract_front_matter(content: &str) -> Result<(std::collections::HashMap<Stri
                     while i < lines.len() {
                         let raw_line = lines[i];
                         // A non-empty, non-indented line signals end of block scalar
-                        if !raw_line.is_empty() && !raw_line.starts_with(' ') && !raw_line.starts_with('\t') {
+                        if !raw_line.is_empty()
+                            && !raw_line.starts_with(' ')
+                            && !raw_line.starts_with('\t')
+                        {
                             break;
                         }
                         // Strip 2-space indentation (standard YAML block indent)
@@ -117,13 +118,21 @@ fn extract_front_matter(content: &str) -> Result<(std::collections::HashMap<Stri
                     }
 
                     // Trim trailing blank lines
-                    while block_lines.last().map(|l: &String| l.trim().is_empty()).unwrap_or(false) {
+                    while block_lines
+                        .last()
+                        .map(|l: &String| l.trim().is_empty())
+                        .unwrap_or(false)
+                    {
                         block_lines.pop();
                     }
 
                     let value = if is_folded {
                         // Folded: collapse newlines to spaces
-                        block_lines.iter().map(|l| l.trim_end().to_string()).collect::<Vec<_>>().join(" ")
+                        block_lines
+                            .iter()
+                            .map(|l| l.trim_end().to_string())
+                            .collect::<Vec<_>>()
+                            .join(" ")
                     } else {
                         // Literal: preserve newlines
                         block_lines.join("\n")
@@ -245,7 +254,14 @@ mod tests {
     fn test_find_skill_md_max_depth() {
         let tmp = tempfile::tempdir().unwrap();
         // depth 6 (a/b/c/d/e/f): should not be found (max depth is 5)
-        let deep = tmp.path().join("a").join("b").join("c").join("d").join("e").join("f");
+        let deep = tmp
+            .path()
+            .join("a")
+            .join("b")
+            .join("c")
+            .join("d")
+            .join("e")
+            .join("f");
         fs::create_dir_all(&deep).unwrap();
         fs::write(deep.join("SKILL.md"), "---\nname: deep\n---\n").unwrap();
         let results = find_skill_md_files(tmp.path());
@@ -273,14 +289,22 @@ mod tests {
         fs::write(agents.join("SKILL.md"), "---\nname: agents-skill\n---\n").unwrap();
         let results = find_skill_md_files(tmp.path());
         assert_eq!(results.len(), 1);
-        assert!(results[0].to_string_lossy().contains("agents-skill") || results[0].to_string_lossy().contains(".agents"));
+        assert!(
+            results[0].to_string_lossy().contains("agents-skill")
+                || results[0].to_string_lossy().contains(".agents")
+        );
     }
 
     #[test]
     fn test_find_skill_md_deep_hidden_path() {
         // Simulate oz-skills structure: project/.agents/skills/skill-A/SKILL.md (depth 4)
         let tmp = tempfile::tempdir().unwrap();
-        let deep = tmp.path().join("project").join(".agents").join("skills").join("skill-a");
+        let deep = tmp
+            .path()
+            .join("project")
+            .join(".agents")
+            .join("skills")
+            .join("skill-a");
         fs::create_dir_all(&deep).unwrap();
         fs::write(deep.join("SKILL.md"), "---\nname: deep-skill\n---\n").unwrap();
         let results = find_skill_md_files(tmp.path());
@@ -290,7 +314,8 @@ mod tests {
 
     #[test]
     fn test_parse_block_scalar_literal() {
-        let content = "---\nname: test\ndescription: |\n  Line one.\n  Line two.\n  Line three.\n---\n";
+        let content =
+            "---\nname: test\ndescription: |\n  Line one.\n  Line two.\n  Line three.\n---\n";
         let (fm, _) = extract_front_matter(content).unwrap();
         let desc = fm.get("description").unwrap();
         assert!(desc.contains("Line one."), "got: {desc}");

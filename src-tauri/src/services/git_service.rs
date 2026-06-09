@@ -25,13 +25,15 @@ pub fn get_git_info(path: &str) -> Result<GitInfo, String> {
         }
     };
 
-    let branch = repo.head()
+    let branch = repo
+        .head()
         .ok()
         .and_then(|head| head.shorthand().map(|s| s.to_string()));
 
     let commit_count = count_commits(&repo).unwrap_or(0);
 
-    let last_commit_time = repo.head()
+    let last_commit_time = repo
+        .head()
         .ok()
         .and_then(|head| head.target())
         .and_then(|oid| repo.find_commit(oid).ok())
@@ -42,7 +44,8 @@ pub fn get_git_info(path: &str) -> Result<GitInfo, String> {
             Some(utc.to_rfc3339())
         });
 
-    let remote_url = repo.find_remote("origin")
+    let remote_url = repo
+        .find_remote("origin")
         .ok()
         .and_then(|r| r.url().map(|s| s.to_string()));
 
@@ -56,10 +59,16 @@ pub fn get_git_info(path: &str) -> Result<GitInfo, String> {
 }
 
 fn count_commits(repo: &git2::Repository) -> Result<usize, String> {
-    let head = repo.head().map_err(|e| format!("Failed to get HEAD: {e}"))?;
+    let head = repo
+        .head()
+        .map_err(|e| format!("Failed to get HEAD: {e}"))?;
     let oid = head.target().ok_or("HEAD has no target")?;
-    let mut revwalk = repo.revwalk().map_err(|e| format!("Failed to create revwalk: {e}"))?;
-    revwalk.push(oid).map_err(|e| format!("Failed to push OID: {e}"))?;
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| format!("Failed to create revwalk: {e}"))?;
+    revwalk
+        .push(oid)
+        .map_err(|e| format!("Failed to push OID: {e}"))?;
     Ok(revwalk.count())
 }
 
@@ -91,15 +100,8 @@ mod tests {
             index.write_tree().unwrap()
         };
         let tree = repo.find_tree(tree_id).unwrap();
-        repo.commit(
-            Some("HEAD"),
-            &sig,
-            &sig,
-            "Initial commit",
-            &tree,
-            &[],
-        )
-        .unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+            .unwrap();
 
         let info = get_git_info(tmp.path().to_str().unwrap()).unwrap();
         assert!(info.is_git_repo);

@@ -29,7 +29,10 @@ mod tests {
     fn test_expand_home_tilde() {
         let expanded = expand_home("~/test/path").unwrap();
         let home = dirs::home_dir().unwrap();
-        assert_eq!(expanded, home.join("test/path").to_string_lossy().to_string());
+        assert_eq!(
+            expanded,
+            home.join("test/path").to_string_lossy().to_string()
+        );
     }
 
     #[test]

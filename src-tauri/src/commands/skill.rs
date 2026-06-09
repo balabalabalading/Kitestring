@@ -32,16 +32,20 @@ pub fn list_skills(project_id: Option<String>) -> Result<Vec<Skill>, String> {
                 .unwrap_or_default();
             let project_path = project.map(|p| p.path.as_str()).unwrap_or("");
 
-            config.skills.into_iter().filter(|s| {
-                // Rule 1: explicitly associated via project.skill_ids
-                skill_ids.contains(&s.id)
+            config
+                .skills
+                .into_iter()
+                .filter(|s| {
+                    // Rule 1: explicitly associated via project.skill_ids
+                    skill_ids.contains(&s.id)
                 // Rule 2: skill source_path is under the project directory
                 || (!project_path.is_empty() && s.source_path.starts_with(project_path))
                 // Rule 3: skill has a distribution whose target_path is under the project directory
                 || (!project_path.is_empty() && config.distributions.iter().any(|d| {
                     d.skill_id == s.id && d.target_path.starts_with(project_path)
                 }))
-            }).collect()
+                })
+                .collect()
         }
         None => config.skills,
     };
@@ -83,18 +87,24 @@ pub fn delete_all_skills(keep_symlinks: bool) -> Result<(), String> {
 /// Set or clear the group label for a skill
 #[tauri::command]
 pub fn set_skill_group(id: String, group: Option<String>) -> Result<(), String> {
-    let mut config = crate::models::config::load_config()?;
-    let skill = config.skills.iter_mut().find(|s| s.id == id).ok_or("Skill not found")?;
-    skill.group = group.clone();
-    // Maintain invariant: every skill.group value must appear in config.groups
-    if let Some(ref name) = group {
-        let trimmed = name.trim().to_string();
-        if !trimmed.is_empty() && !config.groups.contains(&trimmed) {
-            config.groups.push(trimmed);
+    crate::models::config::with_config_lock(|| {
+        let mut config = crate::models::config::load_config()?;
+        let skill = config
+            .skills
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or("Skill not found")?;
+        skill.group = group.clone();
+        // Maintain invariant: every skill.group value must appear in config.groups
+        if let Some(ref name) = group {
+            let trimmed = name.trim().to_string();
+            if !trimmed.is_empty() && !config.groups.contains(&trimmed) {
+                config.groups.push(trimmed);
+            }
         }
-    }
-    crate::models::config::save_config(&config)?;
-    Ok(())
+        crate::models::config::save_config(&config)?;
+        Ok(())
+    })
 }
 
 /// Return all persisted group names
@@ -111,26 +121,30 @@ pub fn create_group(name: String) -> Result<(), String> {
     if trimmed.is_empty() {
         return Err("分组名不能为空".to_string());
     }
-    let mut config = crate::models::config::load_config()?;
-    if !config.groups.contains(&trimmed) {
-        config.groups.push(trimmed);
-        crate::models::config::save_config(&config)?;
-    }
-    Ok(())
+    crate::models::config::with_config_lock(|| {
+        let mut config = crate::models::config::load_config()?;
+        if !config.groups.contains(&trimmed) {
+            config.groups.push(trimmed);
+            crate::models::config::save_config(&config)?;
+        }
+        Ok(())
+    })
 }
 
 /// Delete a group: removes from config.groups and clears skill.group for all skills in this group
 #[tauri::command]
 pub fn delete_group(name: String) -> Result<(), String> {
-    let mut config = crate::models::config::load_config()?;
-    config.groups.retain(|g| g != &name);
-    for skill in &mut config.skills {
-        if skill.group.as_deref() == Some(&name) {
-            skill.group = None;
+    crate::models::config::with_config_lock(|| {
+        let mut config = crate::models::config::load_config()?;
+        config.groups.retain(|g| g != &name);
+        for skill in &mut config.skills {
+            if skill.group.as_deref() == Some(&name) {
+                skill.group = None;
+            }
         }
-    }
-    crate::models::config::save_config(&config)?;
-    Ok(())
+        crate::models::config::save_config(&config)?;
+        Ok(())
+    })
 }
 
 /// Discover and import skills from all tool global paths (resolves symlinks)
@@ -142,16 +156,22 @@ pub fn discover_skills() -> Result<Vec<Skill>, String> {
 /// Refresh a skill's name and description from its SKILL.md on disk
 #[tauri::command]
 pub fn refresh_skill(id: String) -> Result<Skill, String> {
-    let mut config = crate::models::config::load_config()?;
-    let skill = config.skills.iter_mut().find(|s| s.id == id).ok_or("Skill not found")?;
-    let skill_md = Path::new(&skill.source_path).join("SKILL.md");
-    let meta = crate::services::skill_parser::parse_skill_md(&skill_md)?;
-    skill.name = meta.name;
-    skill.description = meta.description;
-    skill.updated_at = chrono::Utc::now().to_rfc3339();
-    let updated = skill.clone();
-    crate::models::config::save_config(&config)?;
-    Ok(updated)
+    crate::models::config::with_config_lock(|| {
+        let mut config = crate::models::config::load_config()?;
+        let skill = config
+            .skills
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or("Skill not found")?;
+        let skill_md = Path::new(&skill.source_path).join("SKILL.md");
+        let meta = crate::services::skill_parser::parse_skill_md(&skill_md)?;
+        skill.name = meta.name;
+        skill.description = meta.description;
+        skill.updated_at = chrono::Utc::now().to_rfc3339();
+        let updated = skill.clone();
+        crate::models::config::save_config(&config)?;
+        Ok(updated)
+    })
 }
 
 /// List all files in a skill's source directory as a tree
@@ -172,17 +192,45 @@ pub fn list_skill_files(skill_id: String) -> Result<Vec<FileNode>, String> {
     Ok(build_file_tree(root, root, 3))
 }
 
-/// Read a file's text content
+/// Read a text file inside a skill's source directory.
 #[tauri::command]
-pub fn read_skill_file(path: String) -> Result<String, String> {
-    let file_path = Path::new(&path);
+pub fn read_skill_file(skill_id: String, relative_path: String) -> Result<String, String> {
+    let rel_path = Path::new(&relative_path);
+    if rel_path.is_absolute() {
+        return Err("File path must be relative to the skill directory".to_string());
+    }
+    if rel_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err("File path cannot escape the skill directory".to_string());
+    }
+
+    let config = crate::models::config::load_config()?;
+    let skill = config
+        .skills
+        .iter()
+        .find(|s| s.id == skill_id)
+        .ok_or("Skill not found")?;
+
+    let root = Path::new(&skill.source_path)
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve skill source path: {e}"))?;
+    let file_path = root.join(rel_path);
     if !file_path.exists() {
         return Err("File does not exist".to_string());
     }
     if file_path.is_dir() {
         return Err("Path is a directory, not a file".to_string());
     }
-    fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {e}"))
+    let resolved_file = file_path
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve file path: {e}"))?;
+    if !resolved_file.starts_with(&root) {
+        return Err("File path cannot escape the skill directory".to_string());
+    }
+
+    fs::read_to_string(resolved_file).map_err(|e| format!("Failed to read file: {e}"))
 }
 
 fn build_file_tree(base: &Path, current: &Path, max_depth: usize) -> Vec<FileNode> {
@@ -199,10 +247,7 @@ fn build_file_tree(base: &Path, current: &Path, max_depth: usize) -> Vec<FileNod
         .filter(|e| {
             let name = e.file_name().to_string_lossy().to_string();
             // Skip hidden files and common non-essential dirs
-            !name.starts_with('.')
-                && name != "node_modules"
-                && name != "target"
-                && name != ".git"
+            !name.starts_with('.') && name != "node_modules" && name != "target" && name != ".git"
         })
         .filter_map(|e| {
             let path = e.path();
@@ -247,7 +292,11 @@ mod tests {
     fn add_skill_with_md(name: &str) -> (String, tempfile::TempDir) {
         let skill_dir = tempfile::tempdir().unwrap();
         let skill_md_path = skill_dir.path().join("SKILL.md");
-        std::fs::write(&skill_md_path, format!("---\nname: {name}\ndescription: original desc\n---\n")).unwrap();
+        std::fs::write(
+            &skill_md_path,
+            format!("---\nname: {name}\ndescription: original desc\n---\n"),
+        )
+        .unwrap();
 
         let mut config = crate::models::config::load_config().unwrap();
         let id = uuid::Uuid::new_v4().to_string();
@@ -274,13 +323,20 @@ mod tests {
 
         // Modify SKILL.md on disk
         let skill_md_path = skill_dir.path().join("SKILL.md");
-        std::fs::write(&skill_md_path, "---\nname: updated-name\ndescription: updated desc\n---\n").unwrap();
+        std::fs::write(
+            &skill_md_path,
+            "---\nname: updated-name\ndescription: updated desc\n---\n",
+        )
+        .unwrap();
 
         let updated = refresh_skill(id.clone()).unwrap();
         assert_eq!(updated.name, "updated-name");
         assert_eq!(updated.description, "updated desc");
         // updated_at should have changed and be valid RFC3339
-        assert_ne!(updated.updated_at, "2024-01-01", "updated_at should be updated");
+        assert_ne!(
+            updated.updated_at, "2024-01-01",
+            "updated_at should be updated"
+        );
         chrono::DateTime::parse_from_rfc3339(&updated.updated_at)
             .expect("updated_at should be valid RFC3339");
 
@@ -288,7 +344,10 @@ mod tests {
         let config = crate::models::config::load_config().unwrap();
         let persisted = config.skills.iter().find(|s| s.id == id).unwrap();
         assert_eq!(persisted.name, "updated-name");
-        assert_ne!(persisted.updated_at, "2024-01-01", "persisted updated_at should be updated");
+        assert_ne!(
+            persisted.updated_at, "2024-01-01",
+            "persisted updated_at should be updated"
+        );
     }
 
     #[test]
@@ -299,7 +358,79 @@ mod tests {
         assert!(result.unwrap_err().to_lowercase().contains("not found"));
     }
 
-    fn make_project(config: &mut crate::models::config::AppConfig, path: &str, skill_ids: Vec<String>) -> String {
+    #[test]
+    fn test_read_skill_file_reads_relative_file() {
+        let _tmp = setup_test_env();
+        let (id, skill_dir) = add_skill_with_md("file-skill");
+        std::fs::create_dir_all(skill_dir.path().join("docs")).unwrap();
+        std::fs::write(skill_dir.path().join("docs").join("note.md"), "hello").unwrap();
+
+        let content = read_skill_file(id, "docs/note.md".to_string()).unwrap();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn test_read_skill_file_rejects_parent_escape() {
+        let _tmp = setup_test_env();
+        let (id, _skill_dir) = add_skill_with_md("escape-skill");
+
+        let result = read_skill_file(id, "../secret.txt".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("escape"));
+    }
+
+    #[test]
+    fn test_read_skill_file_rejects_absolute_path() {
+        let _tmp = setup_test_env();
+        let (id, _skill_dir) = add_skill_with_md("absolute-skill");
+
+        let result = read_skill_file(id, "/etc/hosts".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("relative"));
+    }
+
+    #[test]
+    fn test_read_skill_file_rejects_directory() {
+        let _tmp = setup_test_env();
+        let (id, _skill_dir) = add_skill_with_md("dir-skill");
+
+        let result = read_skill_file(id, ".".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("directory"));
+    }
+
+    #[test]
+    fn test_read_skill_file_rejects_non_utf8() {
+        let _tmp = setup_test_env();
+        let (id, skill_dir) = add_skill_with_md("binary-skill");
+        std::fs::write(skill_dir.path().join("bad.bin"), [0xff, 0xfe, 0xfd]).unwrap();
+
+        let result = read_skill_file(id, "bad.bin".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to read file"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_skill_file_rejects_symlink_escape() {
+        let _tmp = setup_test_env();
+        let outside = tempfile::tempdir().unwrap();
+        let outside_file = outside.path().join("secret.txt");
+        std::fs::write(&outside_file, "secret").unwrap();
+
+        let (id, skill_dir) = add_skill_with_md("symlink-escape-skill");
+        std::os::unix::fs::symlink(&outside_file, skill_dir.path().join("secret-link")).unwrap();
+
+        let result = read_skill_file(id, "secret-link".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("escape"));
+    }
+
+    fn make_project(
+        config: &mut crate::models::config::AppConfig,
+        path: &str,
+        skill_ids: Vec<String>,
+    ) -> String {
         let id = uuid::Uuid::new_v4().to_string();
         config.projects.push(crate::models::project::Project {
             id: id.clone(),
@@ -311,7 +442,11 @@ mod tests {
         id
     }
 
-    fn make_skill_record(config: &mut crate::models::config::AppConfig, name: &str, source_path: &str) -> String {
+    fn make_skill_record(
+        config: &mut crate::models::config::AppConfig,
+        name: &str,
+        source_path: &str,
+    ) -> String {
         let id = uuid::Uuid::new_v4().to_string();
         config.skills.push(crate::models::skill::Skill {
             id: id.clone(),
@@ -339,8 +474,14 @@ mod tests {
 
         let result = list_skills(Some(proj_id)).unwrap();
         let ids: Vec<&str> = result.iter().map(|s| s.id.as_str()).collect();
-        assert!(ids.contains(&id_a.as_str()), "explicitly associated skill should appear");
-        assert!(!ids.contains(&id_b.as_str()), "unassociated skill should not appear");
+        assert!(
+            ids.contains(&id_a.as_str()),
+            "explicitly associated skill should appear"
+        );
+        assert!(
+            !ids.contains(&id_b.as_str()),
+            "unassociated skill should not appear"
+        );
     }
 
     #[test]
@@ -354,8 +495,14 @@ mod tests {
 
         let result = list_skills(Some(proj_id)).unwrap();
         let ids: Vec<&str> = result.iter().map(|s| s.id.as_str()).collect();
-        assert!(ids.contains(&id_inside.as_str()), "skill under project path should appear via rule 2");
-        assert!(!ids.contains(&id_outside.as_str()), "skill outside project path should not appear");
+        assert!(
+            ids.contains(&id_inside.as_str()),
+            "skill under project path should appear via rule 2"
+        );
+        assert!(
+            !ids.contains(&id_outside.as_str()),
+            "skill outside project path should not appear"
+        );
     }
 
     #[test]
@@ -363,25 +510,34 @@ mod tests {
         let _tmp = setup_test_env();
         let mut config = crate::models::config::load_config().unwrap();
         let id_dist = make_skill_record(&mut config, "dist-skill", "/external/source/dist-skill");
-        let id_none = make_skill_record(&mut config, "nodist-skill", "/external/source/nodist-skill");
+        let id_none =
+            make_skill_record(&mut config, "nodist-skill", "/external/source/nodist-skill");
         let proj_id = make_project(&mut config, "/proj", vec![]);
 
         // Add a distribution whose target_path is under the project
-        config.distributions.push(crate::models::distribution::Distribution {
-            id: uuid::Uuid::new_v4().to_string(),
-            skill_id: id_dist.clone(),
-            tool: crate::models::distribution::Tool::ClaudeCode,
-            scope: crate::models::distribution::Scope::Project,
-            target_path: "/proj/.claude/skills/dist-skill".to_string(),
-            status: crate::models::distribution::DistStatus::Linked,
-            entry_type: crate::models::distribution::EntryType::Symlink,
-        });
+        config
+            .distributions
+            .push(crate::models::distribution::Distribution {
+                id: uuid::Uuid::new_v4().to_string(),
+                skill_id: id_dist.clone(),
+                tool: crate::models::distribution::Tool::ClaudeCode,
+                scope: crate::models::distribution::Scope::Project,
+                target_path: "/proj/.claude/skills/dist-skill".to_string(),
+                status: crate::models::distribution::DistStatus::Linked,
+                entry_type: crate::models::distribution::EntryType::Symlink,
+            });
         crate::models::config::save_config(&config).unwrap();
 
         let result = list_skills(Some(proj_id)).unwrap();
         let ids: Vec<&str> = result.iter().map(|s| s.id.as_str()).collect();
-        assert!(ids.contains(&id_dist.as_str()), "skill with distribution in project should appear via rule 3");
-        assert!(!ids.contains(&id_none.as_str()), "skill with no project distribution should not appear");
+        assert!(
+            ids.contains(&id_dist.as_str()),
+            "skill with distribution in project should appear via rule 3"
+        );
+        assert!(
+            !ids.contains(&id_none.as_str()),
+            "skill with no project distribution should not appear"
+        );
     }
 
     #[test]
@@ -389,7 +545,10 @@ mod tests {
         let _tmp = setup_test_env();
         create_group("web-tools".to_string()).unwrap();
         let groups = list_groups().unwrap();
-        assert!(groups.contains(&"web-tools".to_string()), "created group should be persisted");
+        assert!(
+            groups.contains(&"web-tools".to_string()),
+            "created group should be persisted"
+        );
     }
 
     #[test]
@@ -398,7 +557,11 @@ mod tests {
         create_group("my-group".to_string()).unwrap();
         create_group("my-group".to_string()).unwrap();
         let groups = list_groups().unwrap();
-        assert_eq!(groups.iter().filter(|g| *g == "my-group").count(), 1, "duplicate group should not be created");
+        assert_eq!(
+            groups.iter().filter(|g| *g == "my-group").count(),
+            1,
+            "duplicate group should not be created"
+        );
     }
 
     #[test]
@@ -415,16 +578,27 @@ mod tests {
         create_group("old-group".to_string()).unwrap();
         let mut config = crate::models::config::load_config().unwrap();
         let skill_id = make_skill_record(&mut config, "grouped-skill", "/path/grouped-skill");
-        config.skills.iter_mut().find(|s| s.id == skill_id).unwrap().group = Some("old-group".to_string());
+        config
+            .skills
+            .iter_mut()
+            .find(|s| s.id == skill_id)
+            .unwrap()
+            .group = Some("old-group".to_string());
         crate::models::config::save_config(&config).unwrap();
 
         delete_group("old-group".to_string()).unwrap();
 
         let groups = list_groups().unwrap();
-        assert!(!groups.contains(&"old-group".to_string()), "deleted group should not appear in list");
+        assert!(
+            !groups.contains(&"old-group".to_string()),
+            "deleted group should not appear in list"
+        );
         let config = crate::models::config::load_config().unwrap();
         let skill = config.skills.iter().find(|s| s.id == skill_id).unwrap();
-        assert_eq!(skill.group, None, "skill.group should be cleared when group is deleted");
+        assert_eq!(
+            skill.group, None,
+            "skill.group should be cleared when group is deleted"
+        );
     }
 
     #[test]
@@ -437,6 +611,9 @@ mod tests {
         // Assigning a group via set_skill_group should auto-upsert the group name
         set_skill_group(skill_id.clone(), Some("auto-group".to_string())).unwrap();
         let groups = list_groups().unwrap();
-        assert!(groups.contains(&"auto-group".to_string()), "set_skill_group should upsert group name to config.groups");
+        assert!(
+            groups.contains(&"auto-group".to_string()),
+            "set_skill_group should upsert group name to config.groups"
+        );
     }
 }

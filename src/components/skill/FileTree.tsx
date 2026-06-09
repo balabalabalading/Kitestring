@@ -10,7 +10,7 @@ interface FileTreeProps {
 
 export default function FileTree({ nodes, onFileSelect, selectedPath, baseDepth = 0 }: FileTreeProps) {
   return (
-    <div className="text-sm font-mono">
+    <div className="text-xs">
       {nodes.map((node) => (
         <FileTreeNode
           key={node.path}
@@ -39,10 +39,10 @@ function FileTreeNode({ node, onFileSelect, selectedPath, depth }: FileTreeNodeP
       <div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full text-left px-1.5 py-0.5 hover:bg-gray-100 rounded flex items-center gap-1.5 text-[#1d1d1f]"
-          style={{ paddingLeft: `${depth * 16 + 6}px` }}
+          className="w-full text-left h-6 hover:bg-bg-surface rounded-sm flex items-center gap-1.5 text-accent-sky transition-colors"
+          style={{ paddingLeft: `${depth * 16}px` }}
         >
-          <span className="text-[10px] text-[#86868b] w-3 text-center">
+          <span className="text-[10px] text-text-tertiary w-3 text-center">
             {expanded ? "▾" : "▸"}
           </span>
           <span className="text-xs">{node.name}</span>
@@ -62,10 +62,12 @@ function FileTreeNode({ node, onFileSelect, selectedPath, depth }: FileTreeNodeP
   return (
     <button
       onClick={() => onFileSelect(node.path)}
-      className={`w-full text-left px-1.5 py-0.5 hover:bg-gray-100 rounded flex items-center gap-1.5 ${
-        selectedPath === node.path ? "bg-blue-50 text-blue-600" : "text-[#424245]"
+      className={`w-full text-left h-6 rounded-sm flex items-center gap-1.5 transition-colors ${
+        selectedPath === node.path
+          ? "bg-bg-hover text-accent-warm"
+          : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
       }`}
-      style={{ paddingLeft: `${depth * 16 + 22}px` }}
+      style={{ paddingLeft: `${depth * 16 + 16}px` }}
     >
       <span className="text-xs truncate">{node.name}</span>
     </button>

@@ -31,8 +31,14 @@ mod tests {
 
     #[test]
     fn test_source_type_serialization() {
-        assert_eq!(serde_json::to_string(&SourceType::Local).unwrap(), "\"Local\"");
-        assert_eq!(serde_json::to_string(&SourceType::Github).unwrap(), "\"Github\"");
+        assert_eq!(
+            serde_json::to_string(&SourceType::Local).unwrap(),
+            "\"Local\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SourceType::Github).unwrap(),
+            "\"Github\""
+        );
     }
 
     #[test]

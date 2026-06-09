@@ -4,3 +4,5 @@ dist/
 target/
 *.log
 .env
+.cache/
+.copilot-artifacts/

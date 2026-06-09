@@ -1,15 +1,15 @@
 use std::fs;
 use std::path::Path;
 
-use crate::models::config::{set_config_dir_for_test, save_config, AppConfig};
+use crate::models::config::{save_config, set_config_dir_for_test, AppConfig};
 use crate::models::skill::{Skill, SourceType};
 
 /// Set up isolated test environment with a temp config directory.
 /// Returns the TempDir (caller must keep it alive for the test duration).
 pub fn setup_test_env() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().expect("Failed to create temp dir");
-    // Create a .agentnexus subdirectory so config_dir points there
-    let config_dir = tmp.path().join(".agentnexus");
+    // Create a .kitestring subdirectory so config_dir points there
+    let config_dir = tmp.path().join(".kitestring");
     fs::create_dir_all(&config_dir).expect("Failed to create config dir");
     set_config_dir_for_test(config_dir);
     // Initialize with default config

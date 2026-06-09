@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 
-use super::skill::Skill;
 use super::distribution::Distribution;
 use super::project::Project;
+use super::skill::Skill;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolPaths {
@@ -67,6 +68,14 @@ impl Default for AppConfig {
                 extra_globals: vec![],
             },
         );
+        tool_paths.insert(
+            "AgentFolder".to_string(),
+            ToolPaths {
+                global: "~/.agents/skills/".to_string(),
+                project: ".agents/skills/".to_string(),
+                extra_globals: vec![],
+            },
+        );
 
         Self {
             skills: Vec::new(),
@@ -85,6 +94,16 @@ thread_local! {
     static CONFIG_DIR_OVERRIDE: RefCell<Option<PathBuf>> = RefCell::new(None);
 }
 
+static CONFIG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+pub fn with_config_lock<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let _guard = CONFIG_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| "Config lock poisoned".to_string())?;
+    f()
+}
+
 #[cfg(test)]
 pub fn set_config_dir_for_test(dir: PathBuf) {
     CONFIG_DIR_OVERRIDE.with(|cell| {
@@ -97,7 +116,7 @@ fn config_dir() -> PathBuf {
         return override_dir;
     }
     let home = dirs::home_dir().expect("Cannot determine home directory");
-    home.join(".agentnexus")
+    home.join(".kitestring")
 }
 
 fn config_file_path() -> PathBuf {
@@ -114,6 +133,8 @@ pub fn load_config() -> Result<AppConfig, String> {
         return Ok(config);
     }
     let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read config: {e}"))?;
+    // Migration: rename legacy "AgentsCLI" key to "AgentFolder" in raw JSON before parsing.
+    let content = content.replace("\"AgentsCLI\"", "\"AgentFolder\"");
     let mut config: AppConfig =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {e}"))?;
 
@@ -127,7 +148,10 @@ pub fn load_config() -> Result<AppConfig, String> {
             .or_insert_with(|| default_paths.clone());
         // Remove deprecated extra_globals paths (replaced by more specific ones)
         if tool == "ClaudeCode" {
-            entry.extra_globals.retain(|eg| eg != "~/.claude/plugins/" && eg != "~/.claude/plugins/marketplaces/antv-infographic/skills");
+            entry.extra_globals.retain(|eg| {
+                eg != "~/.claude/plugins/"
+                    && eg != "~/.claude/plugins/marketplaces/antv-infographic/skills"
+            });
         }
         for eg in &default_paths.extra_globals {
             if !entry.extra_globals.contains(eg) {
@@ -148,8 +172,15 @@ pub fn load_config() -> Result<AppConfig, String> {
 pub fn save_config(config: &AppConfig) -> Result<(), String> {
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
-    let content = serde_json::to_string_pretty(config).map_err(|e| format!("Failed to serialize config: {e}"))?;
-    fs::write(config_file_path(), content).map_err(|e| format!("Failed to write config: {e}"))
+    let content = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("Failed to serialize config: {e}"))?;
+    let final_path = config_file_path();
+    let tmp_path = dir.join(format!(".config.{}.tmp", uuid::Uuid::new_v4()));
+    fs::write(&tmp_path, content).map_err(|e| format!("Failed to write config temp file: {e}"))?;
+    fs::rename(&tmp_path, &final_path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
+        format!("Failed to replace config: {e}")
+    })
 }
 
 #[cfg(test)]
@@ -166,7 +197,7 @@ mod tests {
         assert!(config.skills.is_empty());
         assert!(config.distributions.is_empty());
         assert!(config.projects.is_empty());
-        assert_eq!(config.tool_paths.len(), 4);
+        assert_eq!(config.tool_paths.len(), 5);
     }
 
     #[test]
@@ -175,7 +206,10 @@ mod tests {
         let claude = config.tool_paths.get("ClaudeCode").unwrap();
         assert_eq!(claude.global, "~/.claude/skills/");
         assert_eq!(claude.project, ".claude/skills/");
-        assert_eq!(claude.extra_globals, vec!["~/.claude/plugins/marketplaces".to_string()]);
+        assert_eq!(
+            claude.extra_globals,
+            vec!["~/.claude/plugins/marketplaces".to_string()]
+        );
 
         let copilot = config.tool_paths.get("CopilotCLI").unwrap();
         assert_eq!(copilot.global, "~/.copilot/skills/");
@@ -188,6 +222,11 @@ mod tests {
         let codex = config.tool_paths.get("Codex").unwrap();
         assert_eq!(codex.global, "~/.codex/skills/");
         assert_eq!(codex.project, ".codex/skills/");
+
+        let agents = config.tool_paths.get("AgentFolder").unwrap();
+        assert_eq!(agents.global, "~/.agents/skills/");
+        assert_eq!(agents.project, ".agents/skills/");
+        assert!(agents.extra_globals.is_empty());
     }
 
     #[test]
@@ -230,6 +269,7 @@ mod tests {
         // tool_paths keys should be the string names
         assert!(json.contains("\"ClaudeCode\""));
         assert!(json.contains("\"CopilotCLI\""));
+        assert!(json.contains("\"AgentFolder\""));
         // version field must not be present (removed as dead code)
         assert!(!json.contains("\"version\""));
     }

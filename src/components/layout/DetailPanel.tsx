@@ -3,17 +3,27 @@ import type { Skill, Distribution, GitInfo, Tool, DistStatus, AppConfig } from "
 import { TOOL_DISPLAY_NAMES } from "../../types";
 import * as tauri from "../../lib/tauri";
 import FileTree from "../skill/FileTree";
+import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
+import { Dialog } from "../ui/Dialog";
+import { Input } from "../ui/Input";
+import { Tag } from "../ui/Tag";
+import { useToast } from "../ui/Toast";
 
 
 interface DetailPanelProps {
   skill: Skill | null;
+  totalSkillsCount: number;
   onSkillDeleted: (id: string) => void;
   onSkillPulled: () => void;
+  onImport?: (tab: "local" | "github") => void;
+  onDiscover?: () => void;
+  onCreateProject?: () => void;
 }
 
-const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex"];
+const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
 
-export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: DetailPanelProps) {
+export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, onSkillPulled, onImport, onDiscover, onCreateProject }: DetailPanelProps) {
   const [distributions, setDistributions] = useState<Distribution[]>([]);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [files, setFiles] = useState<tauri.FileNode[]>([]);
@@ -26,14 +36,10 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
   const [detailReloadKey, setDetailReloadKey] = useState(0);
   const [addingPathTool, setAddingPathTool] = useState<Tool | null>(null);
   const [customPathInput, setCustomPathInput] = useState("");
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [keepSymlinks, setKeepSymlinks] = useState(false);
 
-  function showToast(msg: string, ok: boolean) {
-    setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3000);
-  }
+  const { showToast } = useToast();
 
   useEffect(() => {
     tauri.getAppConfig().then(setAppConfig).catch(console.error);
@@ -88,7 +94,7 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
       const result = await tauri.pullGithubSkill(skill.id);
       onSkillPulled();
       setDetailReloadKey((k) => k + 1);
-      showToast(result.updated ? "更新成功" : "当前版本已是最新", true);
+      showToast(result.updated ? "更新成功" : "当前版本已是最新");
     } catch (e) {
       setActionError(String(e));
     } finally {
@@ -97,21 +103,143 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
   }
 
   if (!skill) {
+    // 首次启动：没有任何 Skill
+    if (totalSkillsCount === 0) {
+      return (
+        <main className="flex-1 flex flex-col items-center justify-center text-text-tertiary px-8 py-12 overflow-y-auto min-h-full">
+          <div className="flex flex-col gap-8 w-[540px]">
+            {/* header */}
+            <div className="flex flex-col gap-1 w-[488px]">
+              <div className="flex items-center gap-1">
+                <svg
+                  width="38" height="34" viewBox="0 0 56 56" fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="animate-[kite-float_4s_ease-in-out_infinite] opacity-80 shrink-0"
+                  style={{ color: "var(--accent-warm)" }}
+                >
+                  <path d="M28 4 L50 28 L28 48 L6 28 Z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+                  <line x1="6" y1="28" x2="50" y2="28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+                  <line x1="28" y1="4" x2="28" y2="48" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+                  <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                </svg>
+                <p style={{ fontFamily: "var(--font-serif)", fontSize: "24px", fontWeight: 500, color: "var(--text-primary)" }}>
+                  开始编织你的 Skill 网络
+                </p>
+              </div>
+              <p className="text-[13px] text-text-secondary">
+                支持 Git 版本追踪 • symlink 链接分发 • Claude / Copilot / Gemini / Codex / Agent
+              </p>
+            </div>
+
+            {/* skill import */}
+            <div className="flex flex-col gap-3">
+              <p style={{ fontFamily: "var(--font-serif)", fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>
+                导入 Skill
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <p className="text-[14px] text-text-primary" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
+                  创建 Skill 实例。适用于全局型的 Skill，创建实例后可以分发至任意路径：
+                </p>
+
+                {/* 方式 1：检索工具路径 */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[13px] text-text-secondary">从 Claude/Copilot/Gemini/Codex/Agent 的默认用户路径中检索已存在的 skills 并导入：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={onDiscover}
+                  >
+                    检索工具默认用户路径并导入
+                  </Button>
+                </div>
+
+                {/* 方式 2：本地文件夹 */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[13px] text-text-secondary">选择本地文件夹并导入该文件夹包含的所有 skills：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => onImport?.("local")}
+                  >
+                    选择本地文件夹并导入
+                  </Button>
+                </div>
+
+                {/* 方式 3：GitHub */}
+                <div className="flex flex-col gap-1">
+                  <p className="text-[13px] text-text-secondary">从 GitHub 导入：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => onImport?.("github")}
+                  >
+                    输入 GitHub 链接并导入
+                  </Button>
+                </div>
+
+                <div className="flex flex-col gap-1 pt-4">
+                  <p className="text-[14px] text-text-primary" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
+                    创建项目。适用于多工具同时使用的场景，支持将同一 Skill 分发至多个工具：
+                  </p>
+                  <p className="text-[13px] text-text-secondary">选择本地文件夹并导入，同时创建项目，以项目维度管理：</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="self-start"
+                    onClick={onCreateProject}
+                  >
+                    选择本地文件夹并导入，同时创建项目
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* skill export */}
+            <div className="flex flex-col gap-3">
+              <p style={{ fontFamily: "var(--font-serif)", fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>
+                分发 Skill
+              </p>
+              <p className="text-[13px] text-text-secondary">
+                成功导入 Skill 后，即可在 Skill 或项目详情页创建指向 Skill 的 symlink。
+              </p>
+            </div>
+          </div>
+        </main>
+      );
+    }
+    // 有 Skill 但未选中
     return (
-      <main className="flex-1 flex items-center justify-center text-[#86868b] text-sm">
-        选择一个 Skill 查看详情
+      <main className="flex-1 flex flex-col items-center justify-center gap-4 text-text-tertiary">
+        <svg
+          width="56" height="56" viewBox="0 0 56 56" fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="animate-[kite-float_4s_ease-in-out_infinite] opacity-70"
+          style={{ color: "var(--accent-warm)" }}
+        >
+          <path d="M28 4 L50 28 L28 48 L6 28 Z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+          <line x1="6" y1="28" x2="50" y2="28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+          <line x1="28" y1="4" x2="28" y2="48" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+          <path d="M28 48 Q30 52 28 58" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+        </svg>
+        <p style={{ fontFamily: "var(--font-serif)", fontSize: "16px" }}>
+          选择一个 Skill 查看详情
+        </p>
       </main>
     );
   }
 
   const skillDists = distributions.filter((d) => d.skill_id === skill.id);
 
-  function statusColor(status: DistStatus | "none") {
+  function statusStyle(status: DistStatus | "none"): { backgroundColor: string } {
     switch (status) {
-      case "Linked":  return "bg-green-400";
-      case "Broken":  return "bg-red-400";
-      case "Pending": return "bg-yellow-400";
-      default:        return "bg-gray-300";
+      case "Linked":  return { backgroundColor: "var(--status-linked)" };
+      case "Broken":  return { backgroundColor: "var(--status-broken)" };
+      case "Pending": return { backgroundColor: "var(--status-pending)" };
+      default:        return { backgroundColor: "var(--text-tertiary)" };
     }
   }
 
@@ -132,9 +260,16 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
   function getCustomDists(tool: Tool): Distribution[] {
     const globalPath = getExpandedGlobalPath(tool);
     const extraExpandedPaths = getExpandedExtraGlobals(tool).map((e) => e.path);
-    return skillDists.filter(
-      (d) => d.tool === tool && d.target_path !== globalPath && !extraExpandedPaths.includes(d.target_path)
-    );
+    const projPath = getProjectRelativeSourcePath(tool);
+    return skillDists.filter((d) => {
+      if (d.tool !== tool) return false;
+      if (d.target_path === globalPath) return false;
+      // Use startsWith to exclude distributions nested inside any extra_global path
+      if (extraExpandedPaths.some((ep) => d.target_path.startsWith(ep + "/"))) return false;
+      // Exclude distributions already represented by the project-relative source row
+      if (projPath && d.target_path.startsWith(projPath + "/")) return false;
+      return true;
+    });
   }
 
   /** Expand extra_globals for a tool to absolute paths with folder/parent info */
@@ -241,153 +376,170 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
 
   return (
     <>
-      {/* Toast — outside main to avoid overflow-hidden clipping in WebView */}
-      {toast && (
-        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-lg shadow-lg text-sm font-medium pointer-events-none ${toast.ok ? "bg-[#1d1d1f] text-white" : "bg-red-500 text-white"}`}>
-          {toast.msg}
-        </div>
-      )}
-
-      {/* Delete confirmation modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-80 p-6">
-            <h3 className="text-sm font-semibold text-[#1d1d1f] mb-2">删除 Skill</h3>
-            <p className="text-xs text-[#424245] mb-1">
-              确认从 AgentNexus 中移除「{skill.name}」？
-            </p>
-            <p className="text-xs text-[#86868b] mb-4">
-              不会删除本地文件夹。
-            </p>
-            {actionError && (
-              <div className="mb-3 text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded-md">{actionError}</div>
-            )}
-            <div className="flex flex-col gap-2">
-              {distributions.filter((d) => d.entry_type === "Symlink").length > 0 && (
-                <button
-                  onClick={() => { setKeepSymlinks(false); handleDelete(); }}
-                  disabled={deleting}
-                  className="text-xs px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 text-left"
-                >
-                  {deleting ? "删除中..." : `删除并清理 symlink（${distributions.filter((d) => d.entry_type === "Symlink").length} 个）`}
-                </button>
-              )}
-              <button
-                onClick={() => { setKeepSymlinks(true); handleDelete(); }}
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDelete} onClose={() => { setConfirmDelete(false); setActionError(null); }}>
+        <div className="p-6">
+          <h3 className="text-[14px] font-normal text-text-primary mb-2">删除技能</h3>
+          <p className="text-[13px] text-text-secondary mb-1">
+            确认从 Kitestring 中移除「{skill.name}」？
+          </p>
+          <p className="text-[13px] text-text-tertiary mb-4">
+            不会删除本地文件夹。
+          </p>
+          {actionError && (
+            <div className="mb-3 text-xs px-3 py-1.5 rounded-md" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>{actionError}</div>
+          )}
+          <div className="flex flex-col gap-2">
+            {distributions.filter((d) => d.entry_type === "Symlink").length > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => { setKeepSymlinks(false); handleDelete(); }}
                 disabled={deleting}
-                className="text-xs px-4 py-2 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50 disabled:opacity-50 text-left"
+                className="w-full justify-start"
+                danger
               >
-                {deleting ? "删除中..." : "仅删除记录（保留 symlink）"}
-              </button>
-              <button
-                onClick={() => { setConfirmDelete(false); setActionError(null); }}
-                className="text-xs px-4 py-1.5 rounded-md text-[#86868b] hover:text-[#424245]"
-              >
-                取消
-              </button>
-            </div>
+                {deleting ? "删除中..." : `删除并清理 symlink（${distributions.filter((d) => d.entry_type === "Symlink").length} 个）`}
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { setKeepSymlinks(true); handleDelete(); }}
+              disabled={deleting}
+              className="w-full justify-start"
+            >
+              {deleting ? "删除中..." : "仅删除记录（保留 symlink）"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setConfirmDelete(false); setActionError(null); }}
+              className="w-full justify-center"
+            >
+              取消
+            </Button>
           </div>
         </div>
-      )}
+      </Dialog>
 
-    <main className="flex-1 flex flex-col p-8 min-h-0 overflow-y-auto">
+    <main key={skill.id} className="flex-1 flex flex-col px-6 py-8 min-h-0 overflow-y-auto gap-6 animate-[panel-enter_200ms_var(--ease-out)_both]">
 
-      {/* Header */}
-      <div className="mb-6 shrink-0">
-        <div className="flex items-center flex-wrap gap-2 mb-1">
-          {/* Skill name + badge */}
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">{skill.name}</h2>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[#f5f5f7] text-[#86868b]">
-            {skill.source_type === "Github" ? "GitHub" : "本地"}
-          </span>
-          {/* Action buttons — inline, close to the name */}
-          {canPull && (
-            <button
-              onClick={handlePull}
-              disabled={pulling}
-              className="text-xs px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-[#424245] disabled:opacity-50 transition-colors"
-            >
-              {pulling ? "拉取中..." : "拉取更新"}
-            </button>
+      {/* Identity Card */}
+      <div className="bg-bg-elevated rounded-lg px-6 py-3 flex flex-col gap-3 shrink-0">
+        {/* Head: title + tags + description */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[22px] font-medium text-text-primary leading-tight">
+              {skill.name}
+            </h2>
+            <div className="flex items-center gap-[7px]">
+              {skill.source_type === "Github" ? (
+                <Tag variant="sky" size="md">GitHub</Tag>
+              ) : (
+                <>
+                  <Tag variant="earth" size="md">本地</Tag>
+                  {skill.has_git && <Tag variant="sky" size="md">GitHub</Tag>}
+                </>
+              )}
+            </div>
+          </div>
+          {skill.description && (
+            <p className="text-[13px] text-text-secondary leading-relaxed">{skill.description}</p>
           )}
-          <button
-            onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
-            className="text-xs px-3 py-1 rounded-md border border-red-200 bg-white hover:bg-red-50 text-red-500 transition-colors"
-          >
-            删除 Skill
-          </button>
         </div>
-        {skill.description && (
-          <p className="text-sm text-[#424245] mt-1 leading-relaxed">{skill.description}</p>
-        )}
-        <p className="text-xs text-[#86868b] mt-2 font-mono">{skill.source_path}</p>
-        {gitInfo?.is_git_repo && (
-          <p className="text-xs text-[#86868b] mt-1">
-            <span className="font-mono">{gitInfo.branch}</span>
-            {" · "}
-            <span>{gitInfo.commit_count} commits</span>
-            {gitInfo.last_commit_time && (
-              <>{" · "}<span>更新于 {gitInfo.last_commit_time.slice(0, 10)}</span></>
-            )}
-          </p>
-        )}
-      </div>
 
-      {/* Content & Distribution — fills remaining height */}
-      <div className="flex gap-6 flex-1 min-h-0">
-        {/* Distribution Status — 3/4 */}
-        <div className="flex-[3] flex flex-col min-w-0 min-h-0">
-          <h3 className="text-sm font-medium text-[#1d1d1f] mb-3 shrink-0">分发状态</h3>
-          {distError && (
-            <div className="mb-2 text-xs text-red-500 bg-red-50 px-2 py-1.5 rounded-md shrink-0">
-              {distError}
+        {/* Path + Git info */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-semibold text-text-tertiary shrink-0">路径</span>
+            <span className="text-[10px] text-text-secondary font-mono truncate">{skill.source_path}</span>
+          </div>
+          {gitInfo?.is_git_repo && (
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-semibold text-text-tertiary shrink-0">Git</span>
+              <span className="text-[10px] text-text-secondary">
+                {gitInfo.branch}
+                {gitInfo.commit_count ? ` · ${gitInfo.commit_count} commits` : ""}
+                {gitInfo.last_commit_time ? ` · 更新于 ${gitInfo.last_commit_time.slice(0, 10)}` : ""}
+              </span>
             </div>
           )}
-          <div className="space-y-2 overflow-y-auto flex-1">
-            {TOOLS.map((tool) => {
-              const globalDist = getGlobalDist(tool);
-              const customDists = getCustomDists(tool);
-              const globalParentPath = getGlobalDisplayPath(tool);
-              const globalParentParts = globalParentPath.replace(/\/$/, "").split("/");
-              const globalFolderName = globalParentParts[globalParentParts.length - 1] ?? "skills";
-              const globalGrandparentPath = globalParentParts.slice(0, -1).join("/") + "/";
-              const isAddingForTool = addingPathTool === tool;
-              const extraGlobals = getExpandedExtraGlobals(tool);
-              const projRelPath = getProjectRelativeSourcePath(tool);
-              return (
-                <div key={tool} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-                  {/* Tool header */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
-                    <span className="text-xs font-medium text-[#1d1d1f]">{TOOL_DISPLAY_NAMES[tool]}</span>
-                    <button
-                      onClick={() => {
-                        setAddingPathTool(isAddingForTool ? null : tool);
-                        setCustomPathInput("");
-                        setDistError(null);
-                      }}
-                      className="text-sm text-[#86868b] hover:text-[#1d1d1f] w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200"
-                      title="添加自定义路径"
-                    >
-                      +
-                    </button>
-                  </div>
+        </div>
 
-                  {/* Global path row (always shown) */}
-                  <div className="px-3 py-2 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(globalDist?.status ?? "none")}`} />
-                    <span className="text-[9px] text-[#86868b] bg-gray-100 px-1 py-0.5 rounded shrink-0">用户级</span>
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          {canPull && (
+            <Button variant="secondary" size="sm" onClick={handlePull} disabled={pulling}>
+              {pulling ? "拉取中..." : "拉取更新"}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => { setConfirmDelete(true); setKeepSymlinks(false); setActionError(null); }}
+            danger
+          >
+            删除
+          </Button>
+        </div>
+      </div>
+
+      {/* Tools section */}
+      <div className="flex flex-col gap-2">
+        <p className="text-[11px] font-semibold text-text-primary">工具</p>
+        {distError && (
+          <div className="text-xs px-3 py-1.5 rounded-md" style={{ color: "var(--status-broken)", backgroundColor: "color-mix(in srgb, var(--status-broken) 10%, transparent)" }}>
+            {distError}
+          </div>
+        )}
+        <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+          {TOOLS.map((tool) => {
+            const globalDist = getGlobalDist(tool);
+            const customDists = getCustomDists(tool);
+            const globalParentPath = getGlobalDisplayPath(tool);
+            const globalParentParts = globalParentPath.replace(/\/$/, "").split("/");
+            const globalFolderName = globalParentParts[globalParentParts.length - 1] ?? "skills";
+            const globalGrandparentPath = globalParentParts.slice(0, -1).join("/") + "/";
+            const isAddingForTool = addingPathTool === tool;
+            const extraGlobals = getExpandedExtraGlobals(tool);
+            const projRelPath = getProjectRelativeSourcePath(tool);
+            return (
+              <Card key={tool} variant="tool">
+                {/* Tool card header */}
+                <div className="flex items-center justify-between px-6 py-2 bg-bg-surface">
+                  <span className="text-[13px] font-semibold text-text-primary">{TOOL_DISPLAY_NAMES[tool]}</span>
+                  <Button
+                    variant="icon"
+                    onClick={() => {
+                      setAddingPathTool(isAddingForTool ? null : tool);
+                      setCustomPathInput("");
+                      setDistError(null);
+                    }}
+                    title="添加自定义路径"
+                  >
+                    +
+                  </Button>
+                </div>
+
+                {/* Distribution rows container */}
+                <div className="px-6 py-3 flex flex-col gap-3">
+                  {/* Global path row */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={isFileSource(tool) ? { backgroundColor: "var(--status-linked)" } : statusStyle(globalDist?.status ?? "none")} />
+                    <Tag variant="default" size="xs">用户级</Tag>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs text-[#1d1d1f] font-medium truncate">{globalFolderName}</div>
-                      <div className="text-[10px] text-[#86868b] font-mono truncate" title={globalGrandparentPath}>
+                      <div className="text-[10px] text-text-primary truncate">{globalFolderName}</div>
+                      <div className="text-[10px] text-text-tertiary truncate" title={globalGrandparentPath}>
                         {globalGrandparentPath}
                       </div>
                     </div>
                     {isFileSource(tool) ? (
-                      <span className="text-[10px] text-[#86868b] bg-gray-100 px-1.5 py-0.5 rounded shrink-0">文件来源</span>
+                      <Tag variant="default" size="sm">文件来源</Tag>
                     ) : globalDist ? (
-                      <button onClick={() => handleRemoveDist(globalDist.id)} className="text-[10px] text-[#86868b] hover:text-red-500 shrink-0">取消</button>
+                      <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(globalDist.id)} className="shrink-0">取消</Button>
                     ) : (
-                      <button onClick={() => handleDistribute(tool, "Global")} className="text-[10px] text-blue-500 hover:text-blue-600 shrink-0">分发</button>
+                      <Button variant="primary" size="sm" onClick={() => handleDistribute(tool, "Global")} className="shrink-0">分发</Button>
                     )}
                   </div>
 
@@ -396,21 +548,21 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                     const egDist = skillDists.find((d) => d.tool === tool && d.target_path === eg.path + "/" + skill.name);
                     const egIsFileSource = isFileSourceForPath(eg.path);
                     return (
-                      <div key={eg.path} className="px-3 py-2 flex items-center gap-2 border-t border-gray-100">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(egIsFileSource ? "Linked" : egDist?.status ?? "none")}`} />
-                        <span className="text-[9px] text-[#86868b] bg-gray-100 px-1 py-0.5 rounded shrink-0">用户级</span>
+                      <div key={eg.path} className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(egIsFileSource ? "Linked" : egDist?.status ?? "none")} />
+                        <Tag variant="default" size="xs">用户级</Tag>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs text-[#1d1d1f] font-medium truncate">{eg.folderName}/*/skills</div>
-                          <div className="text-[10px] text-[#86868b] font-mono truncate" title={eg.parentPath}>
+                          <div className="text-[10px] text-text-primary truncate">{eg.folderName}/*/skills</div>
+                          <div className="text-[10px] text-text-tertiary truncate" title={eg.parentPath}>
                             {eg.parentPath}
                           </div>
                         </div>
                         {egIsFileSource ? (
-                          <span className="text-[10px] text-[#86868b] bg-gray-100 px-1.5 py-0.5 rounded shrink-0">文件来源</span>
+                          <Tag variant="default" size="sm">文件来源</Tag>
                         ) : egDist ? (
-                          <button onClick={() => handleRemoveDist(egDist.id)} className="text-[10px] text-[#86868b] hover:text-red-500 shrink-0">取消</button>
+                          <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(egDist.id)} className="shrink-0">取消</Button>
                         ) : (
-                          <button onClick={() => handleDistributeToDir(tool, eg.path)} className="text-[10px] text-blue-500 hover:text-blue-600 shrink-0">分发</button>
+                          <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, eg.path)} className="shrink-0">分发</Button>
                         )}
                       </div>
                     );
@@ -422,16 +574,16 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                     const folderName = parts[parts.length - 1] ?? "";
                     const parentPath = parts.slice(0, -1).join("/") + "/";
                     return (
-                      <div className="px-3 py-2 flex items-center gap-2 border-t border-gray-100">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-400" />
-                        <span className="text-[9px] text-[#86868b] bg-gray-100 px-1 py-0.5 rounded shrink-0">项目级</span>
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "var(--status-linked)" }} />
+                        <Tag variant="default" size="xs">项目级</Tag>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs text-[#1d1d1f] font-medium truncate">{folderName}</div>
-                          <div className="text-[10px] text-[#86868b] font-mono truncate" title={parentPath}>
+                          <div className="text-[10px] text-text-primary truncate">{folderName}</div>
+                          <div className="text-[10px] text-text-tertiary truncate" title={parentPath}>
                             {parentPath}
                           </div>
                         </div>
-                        <span className="text-[10px] text-[#86868b] bg-gray-100 px-1.5 py-0.5 rounded shrink-0">文件来源</span>
+                        <Tag variant="default" size="sm">文件来源</Tag>
                       </div>
                     );
                   })()}
@@ -442,29 +594,28 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                     const containerName = parts[parts.length - 2] ?? parts[parts.length - 1] ?? "";
                     const grandparentPath = parts.slice(0, -2).join("/") + "/";
                     return (
-                      <div key={dist.id} className="px-3 py-2 flex items-center gap-2 border-t border-gray-100">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor(dist.status)}`} />
-                        <span className="text-[9px] text-[#86868b] bg-gray-100 px-1 py-0.5 rounded shrink-0">项目级</span>
+                      <div key={dist.id} className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={statusStyle(dist.status)} />
+                        <Tag variant="default" size="xs">项目级</Tag>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs text-[#1d1d1f] font-medium truncate">{containerName}</div>
-                          <div className="text-[10px] text-[#86868b] font-mono truncate" title={grandparentPath}>
+                          <div className="text-[10px] text-text-primary truncate">{containerName}</div>
+                          <div className="text-[10px] text-text-tertiary truncate" title={grandparentPath}>
                             {grandparentPath}
                           </div>
                         </div>
-                        <button onClick={() => handleRemoveDist(dist.id)} className="text-[10px] text-[#86868b] hover:text-red-500 shrink-0">取消</button>
+                        <Button variant="secondary" size="sm" onClick={() => handleRemoveDist(dist.id)} className="shrink-0">取消</Button>
                       </div>
                     );
                   })}
 
                   {/* Add custom path input */}
                   {isAddingForTool && (
-                    <div className="px-3 py-2 border-t border-gray-100">
-                      <input
-                        type="text"
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        mono
                         value={customPathInput}
                         onChange={(e) => setCustomPathInput(e.target.value)}
                         placeholder="~/path/to/skills/"
-                        className="w-full text-[10px] px-2 py-1 rounded border border-gray-300 font-mono mb-1.5 focus:outline-none focus:border-blue-400"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleDistributeToDir(tool, customPathInput);
@@ -472,37 +623,34 @@ export default function DetailPanel({ skill, onSkillDeleted, onSkillPulled }: De
                         }}
                       />
                       <div className="flex gap-1.5">
-                        <button onClick={() => handleDistributeToDir(tool, customPathInput)} className="flex-1 text-[10px] py-1 bg-[#1d1d1f] text-white rounded">确认</button>
-                        <button onClick={() => { setAddingPathTool(null); setCustomPathInput(""); }} className="text-[10px] px-2 py-1 rounded border border-gray-300 text-[#86868b]">取消</button>
+                        <Button variant="primary" size="sm" onClick={() => handleDistributeToDir(tool, customPathInput)} className="flex-1">确认</Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setAddingPathTool(null); setCustomPathInput(""); }}>取消</Button>
                       </div>
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
+              </Card>
+            );
+          })}
         </div>
+      </div>
 
-        {/* File Tree — 1/4 */}
-        <div className="flex-[1] flex flex-col min-w-0 min-h-0 max-w-xs">
-          <h3 className="text-sm font-medium text-[#1d1d1f] mb-3 shrink-0">文件结构</h3>
-          <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-1 min-h-0">
-            {files.length > 0 ? (
-              <div className="overflow-y-auto py-1 w-full">
-                <FileTree
-                  nodes={files}
-                  onFileSelect={() => {}}
-                  selectedPath={undefined}
-                />
-              </div>
-            ) : (
-              <div className="p-4 text-sm text-[#86868b]">加载文件结构中...</div>
-            )}
-          </div>
+      {/* Files section */}
+      <div className="flex flex-col gap-2 shrink-0">
+        <p className="text-[11px] font-semibold text-text-primary">文件</p>
+        <div className="rounded-lg bg-bg-elevated p-2 w-full max-w-[260px]">
+          {files.length > 0 ? (
+            <FileTree
+              nodes={files}
+              onFileSelect={() => {}}
+              selectedPath={undefined}
+            />
+          ) : (
+            <div className="py-1 px-2 text-[11px] text-text-tertiary">加载中...</div>
+          )}
         </div>
       </div>
     </main>
   </>
   );
 }
-

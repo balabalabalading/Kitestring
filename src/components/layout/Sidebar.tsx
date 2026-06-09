@@ -1,32 +1,39 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useBreakpoint } from "../../hooks/useBreakpoint";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Skill, Project, GitInfo } from "../../types";
+import type { Skill, Project } from "../../types";
 import * as tauri from "../../lib/tauri";
 import SettingsPanel from "./SettingsPanel";
 import CreateProjectDialog from "../project/CreateProjectDialog";
+import { Dialog } from "../ui/Dialog";
+import { Button } from "../ui/Button";
+import { Input } from "../ui/Input";
 
 interface SidebarProps {
   selectedSkill: Skill | null;
   onSelectSkill: (skill: Skill | null) => void;
   onSkillsCleared?: () => void;
+  onSkillsLoaded?: (count: number) => void;
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
+  controlledImportOpen?: boolean;
+  controlledImportTab?: "local" | "github";
+  onControlledImportClose?: () => void;
 }
 
-export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared, selectedProject, onSelectProject }: SidebarProps) {
+export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp, controlledImportOpen, controlledImportTab, onControlledImportClose }: SidebarProps) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [gitInfoMap, setGitInfoMap] = useState<Record<string, GitInfo>>({});
   const [query, setQuery] = useState("");
-  const [showImportPopover, setShowImportPopover] = useState(false);
-  const [showGithubInput, setShowGithubInput] = useState(false);
+  const [activeTab, setActiveTab] = useState<"skills" | "projects">("skills");
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importTab, setImportTab] = useState<"local" | "github">("local");
+  const [importLocalPath, setImportLocalPath] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
-  const [skillsCollapsed, setSkillsCollapsed] = useState(false);
-  const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   // Grouping dialog
   const [pendingGroupSkills, setPendingGroupSkills] = useState<Skill[]>([]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
@@ -35,12 +42,56 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
   const [serverGroups, setServerGroups] = useState<string[]>([]);
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupSelectedSkills, setNewGroupSelectedSkills] = useState<Set<string>>(new Set());
+  const [newGroupSearch, setNewGroupSearch] = useState("");
+  // Per-group collapse state, persisted in localStorage
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("kitestring_collapsed_groups");
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
   // Drag-over group
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   // GitHub import conflict handling
   const [pendingConflicts, setPendingConflicts] = useState<tauri.GithubConflict[]>([]);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [currentConflict, setCurrentConflict] = useState<tauri.GithubConflict | null>(null);
+
+  // Responsive state
+  const bp = useBreakpoint();
+  const isNarrow = bp === "narrow";
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  useEffect(() => {
+    if (!isNarrow) setOverlayOpen(false);
+  }, [isNarrow]);
+
+  const onSelectSkill = useCallback((s: Skill | null) => {
+    onSelectSkillProp(s);
+    setOverlayOpen(false);
+  }, [onSelectSkillProp]);
+  const onSelectProject = useCallback((p: Project | null) => {
+    onSelectProjectProp(p);
+    setOverlayOpen(false);
+  }, [onSelectProjectProp]);
+
+  // Auto-switch tab when selection changes from parent
+  useEffect(() => {
+    if (selectedSkill) setActiveTab("skills");
+  }, [selectedSkill]);
+  useEffect(() => {
+    if (selectedProject) setActiveTab("projects");
+  }, [selectedProject]);
+
+  // Sync controlled import state
+  useEffect(() => {
+    if (controlledImportOpen && controlledImportTab) {
+      setImportTab(controlledImportTab);
+      setShowImportDialog(true);
+    }
+  }, [controlledImportOpen, controlledImportTab]);
 
   function openNextConflict(queue: tauri.GithubConflict[]) {
     if (queue.length === 0) {
@@ -85,24 +136,9 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
     openNextConflict(pendingConflicts);
   }
 
-  const importBtnRef = useRef<HTMLButtonElement>(null);
-
   useEffect(() => {
     loadData();
   }, []);
-
-  // Close popover when clicking outside
-  useEffect(() => {
-    if (!showImportPopover) return;
-    function onClickOutside(e: MouseEvent) {
-      if (importBtnRef.current && !importBtnRef.current.closest(".import-popover-root")?.contains(e.target as Node)) {
-        setShowImportPopover(false);
-        setShowGithubInput(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [showImportPopover]);
 
   async function loadData() {
     try {
@@ -114,31 +150,31 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
       setSkills(skillList);
       setProjects(projectList);
       setServerGroups(groupList);
-      const gitResults = await Promise.allSettled(
-        skillList.map((s) => tauri.getGitInfo(s.source_path))
-      );
-      const gitMap: Record<string, GitInfo> = {};
-      skillList.forEach((s, i) => {
-        const r = gitResults[i];
-        if (r.status === "fulfilled") gitMap[s.id] = r.value;
-      });
-      setGitInfoMap(gitMap);
+      onSkillsLoaded?.(skillList.length);
     } catch (e) {
       console.error("Failed to load data:", e);
     }
   }
 
-  async function handleLocalImport() {
-    setShowImportPopover(false);
-    setShowGithubInput(false);
+  function closeImportDialog() {
+    setShowImportDialog(false);
+    setImportLocalPath("");
+    setImportUrl("");
+    setError(null);
+    onControlledImportClose?.();
+  }
+
+  async function handleSelectFolder() {
     const selected = await open({ directory: true, multiple: false });
-    if (!selected) return;
-    const path = typeof selected === "string" ? selected : selected;
-    if (!path) return;
+    if (typeof selected === "string" && selected) setImportLocalPath(selected);
+  }
+
+  async function handleLocalImportConfirm() {
+    if (!importLocalPath) return;
     setLoading(true);
     setError(null);
     try {
-      const newSkills = await tauri.importLocalSkill(path);
+      const newSkills = await tauri.importLocalSkill(importLocalPath);
       if (newSkills.length === 0) {
         setError("未找到 SKILL.md，该文件夹可能不包含有效 Skill");
       } else {
@@ -146,6 +182,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
           const existingIds = new Set(prev.map((s) => s.id));
           return [...prev, ...newSkills.filter((s) => !existingIds.has(s.id))];
         });
+        closeImportDialog();
         if (newSkills.length > 1) {
           setPendingGroupSkills(newSkills);
           setGroupName("未命名");
@@ -167,15 +204,33 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
 
   async function handleCreateGroup() {
     const name = newGroupName.trim();
-    if (!name) return;
+    if (!name || newGroupSelectedSkills.size === 0) return;
     try {
       await tauri.createGroup(name);
+      await Promise.all([...newGroupSelectedSkills].map((id) => tauri.setSkillGroup(id, name)));
       setServerGroups((prev) => prev.includes(name) ? prev : [...prev, name]);
+      await loadData();
     } catch (e) {
       console.error("Failed to create group:", e);
     }
     setShowCreateGroupDialog(false);
     setNewGroupName("");
+    setNewGroupSelectedSkills(new Set());
+  }
+
+  function toggleGroupCollapse(label: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      try {
+        localStorage.setItem("kitestring_collapsed_groups", JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
   }
 
   async function handleDeleteGroup(name: string) {
@@ -194,7 +249,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
     setDragOverGroup(null);
     if (!skillId) return;
     const skill = skills.find((s) => s.id === skillId);
-    if (skill?.group === groupLabel) return; // already in this group
+    if (skill?.group === groupLabel) return;
     await tauri.setSkillGroup(skillId, groupLabel);
     await loadData();
   }
@@ -206,7 +261,6 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
     try {
       const result = await tauri.importGithubSkill(importUrl.trim());
       const { imported, conflicts } = result;
-
       if (imported.length === 0 && conflicts.length === 0) {
         setError("未在仓库中找到 SKILL.md");
       } else {
@@ -216,10 +270,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
             return [...prev, ...imported.filter((s) => !existingIds.has(s.id))];
           });
         }
-        setShowImportPopover(false);
-        setShowGithubInput(false);
-        setImportUrl("");
-        // Process conflicts sequentially via dialog
+        closeImportDialog();
         if (conflicts.length > 0) {
           openNextConflict(conflicts);
         }
@@ -236,16 +287,14 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
     await loadData();
   }
 
-  // Sort skills A-Z
+  // Sort and filter skills
   const sortedSkills = [...skills].sort((a, b) => a.name.localeCompare(b.name));
-
-  // Filter by search query
   const lowerQuery = query.toLowerCase();
   const filteredSkills = lowerQuery
     ? sortedSkills.filter((s) => s.name.toLowerCase().includes(lowerQuery))
     : sortedSkills;
 
-  // Group skills by group field
+  // Group skills
   const groupedSkills: Map<string, Skill[]> = new Map();
   const ungroupedSkills: Skill[] = [];
   for (const skill of filteredSkills) {
@@ -256,7 +305,6 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
       ungroupedSkills.push(skill);
     }
   }
-  // Merge serverGroups (may contain empty groups)
   const allGroupLabels = Array.from(new Set([
     ...Array.from(groupedSkills.keys()),
     ...serverGroups,
@@ -264,482 +312,594 @@ export default function Sidebar({ selectedSkill, onSelectSkill, onSkillsCleared,
 
   const hasSkills = skills.length > 0;
 
-  return (
+  const sidebarInner = (
     <>
-      <aside className="w-[260px] min-w-[260px] border-r border-gray-200 flex flex-col bg-[#f5f5f7] h-full">
-        {/* Skill List */}
-        <nav className="flex-1 overflow-y-auto py-2">
+      {/* Brand strip */}
+      <div
+        className="h-[var(--brand-strip-height)] w-full shrink-0 animate-[brand-breathe_6s_ease-in-out_infinite]"
+        style={{ background: "var(--gradient-skyline)" }}
+      />
 
-          {/* Projects section — always visible header */}
-          <div className="mb-1">
-            <div className="flex items-center px-3 py-1.5">
-              <button
-                onClick={() => setProjectsCollapsed((c) => !c)}
-                className="flex items-center gap-1 flex-1 min-w-0 hover:text-[#1d1d1f] text-left"
-              >
-                <svg className={`w-3 h-3 text-[#86868b] shrink-0 transition-transform ${projectsCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* App title */}
+      <div className="px-4 pt-4 pb-2 shrink-0">
+        <div
+          className="text-text-primary font-normal leading-tight"
+          style={{ fontFamily: "var(--font-serif)", fontSize: "var(--font-size-h1)" }}
+        >
+          Kitestring
+        </div>
+        <div className="text-xs text-text-tertiary mt-0.5">AI 技能管理器</div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center px-4 gap-4 shrink-0 border-b border-border-subtle">
+        {(["skills", "projects"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setActiveTab(tab);
+              if (tab === "skills") onSelectProject(null);
+              else onSelectSkill(null);
+            }}
+            className={`py-2 text-[10px] font-semibold tracking-wider uppercase border-b-2 transition-colors ${
+              activeTab === tab
+                ? "border-accent-warm text-accent-warm"
+                : "border-transparent text-text-tertiary hover:text-text-secondary"
+            }`}
+          >
+            {tab === "skills" ? "Skills" : "Projects"}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <nav className="flex-1 overflow-y-auto py-1">
+        {activeTab === "skills" ? (
+          <>
+            {/* Search + create group toolbar */}
+            <div className="px-3 py-1.5 flex items-center gap-2">
+              <div className="relative flex-1">
+                <svg
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary pointer-events-none"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                 </svg>
-                <span className="text-xs font-medium text-[#86868b] tracking-wide">项目</span>
-              </button>
-              {/* Create project icon — right of 项目 header */}
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="搜索 Skills..."
+                  className="w-full text-xs pl-6 pr-2 py-1 rounded-sm bg-bg-elevated border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary"
+                />
+              </div>
               <button
-                onClick={() => setShowCreateProject(true)}
-                title="新建项目"
-                className="w-6 h-6 rounded-md hover:bg-gray-200 flex items-center justify-center text-[#86868b] hover:text-[#1d1d1f] transition-colors shrink-0"
+                onClick={() => { setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); setShowCreateGroupDialog(true); }}
+                title="创建分组"
+                className="w-6 h-6 rounded-sm hover:bg-bg-elevated flex items-center justify-center text-text-tertiary hover:text-text-primary transition-colors shrink-0"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 10v6m-3-3h6M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                 </svg>
               </button>
             </div>
-            {!projectsCollapsed && (
-              projects.length === 0 ? (
-                <div className="px-5 py-1 text-xs text-[#86868b]">暂无项目</div>
-              ) : (
-                projects.map((project) => {
-                  const isSelected = selectedProject?.id === project.id && !selectedSkill;
-                  return (
+
+            {/* Grouped skills */}
+            {allGroupLabels.map((groupLabel) => {
+              const groupSkills = groupedSkills.get(groupLabel) ?? [];
+              const isOver = dragOverGroup === groupLabel;
+              const isGroupCollapsed = collapsedGroups.has(groupLabel);
+              return (
+                <div key={groupLabel}>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupLabel); }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverGroup(null);
+                    }}
+                    onDrop={(e) => handleDropOnGroup(e, groupLabel)}
+                    className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 rounded-sm transition-colors border border-dashed ${
+                      isOver ? "bg-accent-sky-soft text-accent-sky border-accent-sky" : "border-transparent"
+                    }`}
+                  >
                     <button
-                      key={project.id}
-                      onClick={() => onSelectProject(project)}
-                      className={`w-full text-left py-1.5 px-5 text-xs transition-colors ${
-                        isSelected ? "bg-white text-[#1d1d1f] font-medium" : "text-[#424245] hover:bg-white/60"
-                      }`}
+                      onClick={() => toggleGroupCollapse(groupLabel)}
+                      className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors"
+                      title={isGroupCollapsed ? "展开分组" : "折叠分组"}
                     >
-                      <span className="truncate block">{project.name}</span>
+                      <svg className={`w-2.5 h-2.5 transition-transform ${isGroupCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
                     </button>
-                  );
-                })
-              )
-            )}
-          </div>
-
-          {/* Skills section — always visible header */}
-          <div>
-            <div className="flex items-center px-3 py-1.5">
-              <button
-                onClick={() => setSkillsCollapsed((c) => !c)}
-                className="flex items-center gap-1 flex-1 min-w-0 hover:text-[#1d1d1f] text-left"
-              >
-                <svg className={`w-3 h-3 text-[#86868b] shrink-0 transition-transform ${skillsCollapsed ? "" : "rotate-90"}`} fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5l8 7-8 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </svg>
-                <span className="text-xs font-medium text-[#86868b] tracking-wide">Skills</span>
-              </button>
-              {/* Import Skill icon — right of Skills header */}
-              <div className="relative import-popover-root shrink-0 flex items-center gap-0.5">
-                {/* Create group icon */}
-                <button
-                  onClick={() => { setNewGroupName(""); setShowCreateGroupDialog(true); }}
-                  title="创建分组"
-                  className="w-6 h-6 rounded-md hover:bg-gray-200 flex items-center justify-center text-[#86868b] hover:text-[#1d1d1f] transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                  </svg>
-                </button>
-                <button
-                  ref={importBtnRef}
-                  onClick={() => {
-                    setShowImportPopover(!showImportPopover);
-                    setShowGithubInput(false);
-                    setError(null);
-                  }}
-                  title="导入 Skill"
-                  className="w-6 h-6 rounded-md hover:bg-gray-200 flex items-center justify-center text-[#86868b] hover:text-[#1d1d1f] transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
-                  </svg>
-                </button>
-
-                {showImportPopover && (
-                  <div className="absolute right-0 top-7 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-30 w-52">
-                    {!showGithubInput ? (
-                      <>
-                        <button
-                          onClick={handleLocalImport}
-                          disabled={loading}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-[#1d1d1f] disabled:opacity-50 flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4 text-[#86868b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-                          </svg>
-                          {loading ? "导入中..." : "本地文件夹导入"}
-                        </button>
-                        <button
-                          onClick={() => setShowGithubInput(true)}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-[#1d1d1f] flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4 text-[#86868b]" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.087.636-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-                          </svg>
-                          GitHub 仓库导入
-                        </button>
-                      </>
-                    ) : (
-                      <div className="px-3 py-2 space-y-2">
-                        <div className="text-xs font-medium text-[#86868b] mb-1">GitHub 仓库 URL</div>
-                        <input
-                          type="text"
-                          value={importUrl}
-                          onChange={(e) => setImportUrl(e.target.value)}
-                          placeholder="https://github.com/..."
-                          className="w-full text-xs px-2 py-1.5 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
-                          onKeyDown={(e) => e.key === "Enter" && handleGithubImport()}
-                          autoFocus
-                        />
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={handleGithubImport}
-                            disabled={loading}
-                            className="flex-1 text-xs py-1.5 bg-[#1d1d1f] text-white rounded-md hover:bg-[#424245] disabled:opacity-50"
-                          >
-                            {loading ? "导入中..." : "导入"}
-                          </button>
-                          <button
-                            onClick={() => { setShowGithubInput(false); setImportUrl(""); setError(null); }}
-                            className="text-xs px-2 py-1.5 rounded-md border border-gray-300 text-[#86868b] hover:bg-gray-50"
-                          >
-                            返回
-                          </button>
-                        </div>
-                      </div>
+                    <svg className="w-2.5 h-2.5 shrink-0 opacity-60" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                    </svg>
+                    <span className="truncate">{groupLabel}</span>
+                    {!isOver && (
+                      <span className="ml-auto text-[9px] normal-case font-normal opacity-60 shrink-0">{groupSkills.length}</span>
                     )}
-                    {error && (
-                      <div className="mx-3 mb-2 text-xs text-red-500 bg-red-50 px-2 py-1.5 rounded-md">
-                        {error}
-                      </div>
+                    {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
+                    {!isOver && groupSkills.length === 0 && (
+                      <button
+                        onClick={() => handleDeleteGroup(groupLabel)}
+                        className="text-text-tertiary hover:text-status-broken transition-colors"
+                        title="删除空分组"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
+                  {!isGroupCollapsed && groupSkills.map((skill) => (
+                    <SkillItem
+                      key={skill.id}
+                      skill={skill}
+                      selected={selectedSkill?.id === skill.id}
+                      onSelect={() => onSelectSkill(skill)}
+                      indent
+                    />
+                  ))}
+                </div>
+              );
+            })}
 
-            {/* Search box — below Skills header */}
-            {!skillsCollapsed && (
-              <div className="px-3 pb-1.5">
-                <div className="relative">
-                  <svg
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#86868b] pointer-events-none"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            {ungroupedSkills.map((skill) => (
+              <SkillItem
+                key={skill.id}
+                skill={skill}
+                selected={selectedSkill?.id === skill.id}
+                onSelect={() => onSelectSkill(skill)}
+              />
+            ))}
+
+            {!hasSkills && (
+              <div className="px-5 py-4 text-xs text-text-tertiary">
+                暂无 Skill，先导入一个技能
+              </div>
+            )}
+            {hasSkills && filteredSkills.length === 0 && query && (
+              <div className="px-5 py-3 text-xs text-text-tertiary leading-relaxed">
+                <div>没有匹配的结果</div>
+                <div className="text-[10px] mt-0.5">尝试更换关键词</div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {projects.length === 0 ? (
+              <div className="px-5 py-4 text-xs text-text-tertiary">
+                点击下方「+ 导入项目」开始
+              </div>
+            ) : (
+              projects.map((project) => {
+                const isSelected = selectedProject?.id === project.id;
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => onSelectProject(project)}
+                    className={`relative w-full text-left py-1.5 text-xs transition-colors ${
+                      isSelected
+                        ? "bg-bg-base text-text-primary font-medium before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-accent-warm before:rounded-r-full"
+                        : "text-text-secondary hover:bg-bg-elevated/60"
+                    }`}
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                    <span className="truncate block px-5">{project.name}</span>
+                  </button>
+                );
+              })
+            )}
+          </>
+        )}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-4 py-2 border-t border-border-subtle flex items-center justify-between shrink-0">
+        <button
+          onClick={() => setShowSettings(true)}
+          className="text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          设置
+        </button>
+        {activeTab === "skills" ? (
+          <button
+            onClick={() => {
+              setImportTab("local");
+              setShowImportDialog(true);
+              setError(null);
+            }}
+            className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
+          >
+            + 导入 Skill
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowCreateProject(true)}
+            className="text-xs text-accent-warm hover:text-accent-warm/80 transition-colors"
+          >
+            + 导入项目
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {isNarrow ? (
+        <>
+          {/* Collapsed 60px bar */}
+          <aside className="w-[var(--sidebar-collapsed-width)] shrink-0 border-r border-border-subtle flex flex-col items-center py-3 gap-2 bg-bg-elevated h-full">
+            <div className="w-8 h-1 rounded-full animate-[brand-breathe_6s_ease-in-out_infinite]" style={{ background: "var(--gradient-skyline)" }} />
+            <button
+              onClick={() => setOverlayOpen(true)}
+              title="展开侧边栏"
+              className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="mt-auto">
+              <button
+                onClick={() => setShowSettings(true)}
+                title="设置"
+                className="p-2 rounded-sm text-text-tertiary hover:bg-bg-deep hover:text-text-primary transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
+          </aside>
+          {/* Backdrop */}
+          <div
+            className={`fixed inset-0 z-30 bg-black/30 transition-opacity ${overlayOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            onClick={() => setOverlayOpen(false)}
+          />
+          {/* Overlay sidebar */}
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[var(--sidebar-width)] bg-bg-elevated border-r border-border-subtle flex flex-col overflow-hidden transition-transform duration-200 ${overlayOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            {sidebarInner}
+          </aside>
+        </>
+      ) : (
+        <aside
+          style={{ width: bp === "wide" ? "var(--sidebar-width-wide)" : "var(--sidebar-width)" }}
+          className="min-w-0 border-r border-border-subtle flex flex-col bg-bg-elevated h-full"
+        >
+          {sidebarInner}
+        </aside>
+      )}
+
+      {/* Import Skill dialog */}
+      <Dialog open={showImportDialog || !!controlledImportOpen} onClose={closeImportDialog} width="w-[480px]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
+          <h3 className="text-sm font-normal text-text-primary">导入 Skill</h3>
+          <Button variant="icon" onClick={closeImportDialog}>×</Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center px-5 gap-4 border-b border-border-subtle shrink-0">
+          {(["local", "github"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setImportTab(tab);
+                setError(null);
+              }}
+              className={`py-2 text-xs font-medium border-b-2 transition-colors ${
+                importTab === tab
+                  ? "border-accent-warm text-accent-warm"
+                  : "border-transparent text-text-tertiary hover:text-text-secondary"
+              }`}
+            >
+              {tab === "local" ? "本地文件夹" : "GitHub 仓库"}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="px-5 py-4 space-y-3">
+          {importTab === "local" ? (
+            <>
+              <div>
+                <label className="block text-xs font-normal text-text-secondary mb-1">文件夹路径</label>
+                <div className="flex gap-2">
+                  <Input
+                    mono
+                    value={importLocalPath}
+                    readOnly
+                    placeholder="选择文件夹..."
+                    className="flex-1"
+                  />
+                  <Button variant="secondary" size="sm" onClick={handleSelectFolder}>
+                    选择文件夹
+                  </Button>
+                </div>
+                <p className="text-[10px] text-text-tertiary mt-1">Skill 文件夹需包含 SKILL.md 文件</p>
+              </div>
+              {error && (
+                <div className="text-xs text-status-broken px-3 py-2 rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}>
+                  {error}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-normal text-text-secondary mb-1">仓库地址</label>
+                <Input
+                  type="text"
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  placeholder="https://github.com/..."
+                  mono
+                  onKeyDown={(e) => e.key === "Enter" && handleGithubImport()}
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <div className="text-xs text-status-broken px-3 py-2 rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--status-broken) 8%, transparent)" }}>
+                  {error}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle shrink-0">
+          <Button variant="secondary" size="sm" onClick={closeImportDialog}>返回</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={importTab === "local" ? handleLocalImportConfirm : handleGithubImport}
+            disabled={loading || (importTab === "local" && !importLocalPath)}
+          >
+            {loading ? "导入中..." : "导入"}
+          </Button>
+        </div>
+      </Dialog>
+
+      {/* Create group dialog */}
+      {(() => {
+        const candidateSkills = skills.filter((s) => !s.group).sort((a, b) => a.name.localeCompare(b.name));
+        const lowerSearch = newGroupSearch.trim().toLowerCase();
+        let visibleSkills: typeof candidateSkills;
+        if (lowerSearch) {
+          visibleSkills = candidateSkills.filter((s) => s.name.toLowerCase().includes(lowerSearch));
+        } else {
+          const selected = candidateSkills.filter((s) => newGroupSelectedSkills.has(s.id));
+          const unselected = candidateSkills.filter((s) => !newGroupSelectedSkills.has(s.id));
+          visibleSkills = [...selected, ...unselected];
+        }
+        return (
+          <Dialog
+            open={showCreateGroupDialog}
+            onClose={() => { setShowCreateGroupDialog(false); setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); }}
+            width="w-80"
+          >
+            <div className="px-5 py-4 border-b border-border-subtle">
+              <h3 className="text-sm font-normal text-text-primary">创建分组</h3>
+            </div>
+            <div className="px-5 py-4 space-y-4 overflow-y-auto">
+              <div>
+                <label className="block text-xs font-normal text-text-secondary mb-1">分组名称</label>
+                <Input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="未命名"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <label className="text-xs font-normal text-text-secondary">
+                    选择 Skills
+                    <span className="ml-1 font-normal text-text-tertiary">（至少选一个）</span>
+                  </label>
+                  {newGroupSelectedSkills.size > 0 && (
+                    <span className="text-[10px] text-accent-sky">{newGroupSelectedSkills.size} 已选</span>
+                  )}
+                </div>
+                <div className="relative mb-1.5">
+                  <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                   </svg>
                   <input
                     type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    value={newGroupSearch}
+                    onChange={(e) => setNewGroupSearch(e.target.value)}
                     placeholder="搜索 Skills..."
-                    className="w-full text-xs pl-6 pr-2 py-1 rounded-md bg-white border border-gray-200 focus:outline-none focus:border-blue-400 text-[#1d1d1f] placeholder-[#86868b]"
+                    className="w-full text-xs pl-6 pr-2 py-1.5 rounded-sm border border-border-subtle focus:outline-none focus:border-border-accent text-text-primary placeholder-text-tertiary bg-bg-elevated"
                   />
+                  {newGroupSearch && (
+                    <button
+                      onClick={() => setNewGroupSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <div className="rounded-md border border-border-subtle divide-y divide-border-subtle max-h-44 overflow-y-auto">
+                  {visibleSkills.map((skill) => (
+                    <label
+                      key={skill.id}
+                      className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-bg-elevated select-none"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newGroupSelectedSkills.has(skill.id)}
+                        onChange={(e) => {
+                          setNewGroupSelectedSkills((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(skill.id);
+                            else next.delete(skill.id);
+                            return next;
+                          });
+                        }}
+                        className="w-3.5 h-3.5 rounded accent-accent-warm shrink-0"
+                      />
+                      <span className="text-xs text-text-primary truncate flex-1">{skill.name}</span>
+                    </label>
+                  ))}
+                  {candidateSkills.length === 0 && (
+                    <div className="px-3 py-3 text-xs text-text-tertiary">暂无未分组的 Skills</div>
+                  )}
+                  {candidateSkills.length > 0 && visibleSkills.length === 0 && lowerSearch && (
+                    <div className="px-3 py-3 text-xs text-text-tertiary">没有匹配「{newGroupSearch}」的 Skill</div>
+                  )}
                 </div>
               </div>
-            )}
-
-            {/* Grouped skills */}
-            {!skillsCollapsed && (
-              <>
-                {allGroupLabels.map((groupLabel) => {
-                  const groupSkills = groupedSkills.get(groupLabel) ?? [];
-                  const isOver = dragOverGroup === groupLabel;
-                  return (
-                    <div key={groupLabel}>
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); setDragOverGroup(groupLabel); }}
-                        onDragLeave={(e) => {
-                          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverGroup(null);
-                        }}
-                        onDrop={(e) => handleDropOnGroup(e, groupLabel)}
-                        className={`px-3 pt-1.5 pb-0.5 text-[10px] font-semibold text-[#86868b] uppercase tracking-wide flex items-center gap-1 rounded transition-colors ${
-                          isOver ? "bg-blue-50 text-blue-500" : ""
-                        }`}
-                      >
-                        <svg className="w-2.5 h-2.5 shrink-0 opacity-60" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                        </svg>
-                        <span className="truncate">{groupLabel}</span>
-                        {isOver && <span className="ml-auto text-[9px] normal-case font-normal">拖入</span>}
-                        {!isOver && groupSkills.length === 0 && (
-                          <button
-                            onClick={() => handleDeleteGroup(groupLabel)}
-                            className="ml-auto text-[#86868b] hover:text-red-500 transition-colors"
-                            title="删除空分组"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                      {groupSkills.map((skill) => (
-                        <SkillItem
-                          key={skill.id}
-                          skill={skill}
-                          selected={selectedSkill?.id === skill.id}
-                          onSelect={() => onSelectSkill(skill)}
-                          gitInfo={gitInfoMap[skill.id]}
-                          indent
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-                {ungroupedSkills.map((skill) => (
-                  <SkillItem
-                    key={skill.id}
-                    skill={skill}
-                    selected={selectedSkill?.id === skill.id}
-                    onSelect={() => onSelectSkill(skill)}
-                    gitInfo={gitInfoMap[skill.id]}
-                  />
-                ))}
-              </>
-            )}
-
-            {!skillsCollapsed && !hasSkills && (
-              <div className="px-5 py-4 text-xs text-[#86868b]">
-                点击右侧 ↓ 导入第一个 Skill
-              </div>
-            )}
-            {!skillsCollapsed && hasSkills && filteredSkills.length === 0 && query && (
-              <div className="px-5 py-2 text-xs text-[#86868b]">
-                没有匹配「{query}」的 Skill
-              </div>
-            )}
-          </div>
-        </nav>
-
-        {/* Footer */}
-        <div className="px-4 py-2 border-t border-gray-200 flex items-center justify-between">
-          <span className="text-xs text-[#86868b]">v0.1.0</span>
-          <button
-            onClick={() => setShowSettings(true)}
-            title="设置"
-            className="w-6 h-6 rounded-md flex items-center justify-center text-[#86868b] hover:bg-gray-200 hover:text-[#1d1d1f] transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
-      </aside>
-
-      {/* Create group dialog */}
-      {showCreateGroupDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-72 flex flex-col">
-            <div className="px-5 py-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">创建分组</h3>
             </div>
-            <div className="px-5 py-4">
-              <label className="block text-xs font-medium text-[#424245] mb-1">分组名称</label>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="未命名"
-                className="w-full text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && newGroupName.trim() && handleCreateGroup()}
-              />
-              <p className="text-[11px] text-[#86868b] mt-1.5">创建后可将 Skills 拖入该分组</p>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
-              <button
-                onClick={() => setShowCreateGroupDialog(false)}
-                className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setShowCreateGroupDialog(false); setNewGroupName(""); setNewGroupSelectedSkills(new Set()); setNewGroupSearch(""); }}
               >
                 取消
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleCreateGroup}
-                disabled={!newGroupName.trim()}
-                className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245] disabled:opacity-40"
+                disabled={!newGroupName.trim() || newGroupSelectedSkills.size === 0}
               >
                 创建
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        );
+      })()}
 
       {/* Grouping dialog */}
-      {showGroupDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-80 flex flex-col">
-            <div className="px-5 py-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">将 Skills 分组</h3>
-            </div>
-            <div className="px-5 py-4 space-y-3">
-              <p className="text-xs text-[#424245]">
-                检测到 <span className="font-medium">{pendingGroupSkills.length}</span> 个 Skills，是否将其归为一组？
-              </p>
-              <div>
-                <label className="block text-xs font-medium text-[#424245] mb-1">组名</label>
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:border-blue-400"
-                  autoFocus
-                  onKeyDown={(e) => e.key === "Enter" && handleConfirmGroup()}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
-              <button
-                onClick={() => setShowGroupDialog(false)}
-                className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
-              >
-                不分组
-              </button>
-              <button
-                onClick={handleConfirmGroup}
-                className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245]"
-              >
-                确认分组
-              </button>
-            </div>
+      <Dialog open={showGroupDialog} onClose={() => setShowGroupDialog(false)} width="w-80">
+        <div className="p-6 flex flex-col gap-4">
+          <h3 className="text-[14px] font-normal text-text-primary">将 Skills 分组</h3>
+          <p className="text-[13px] text-text-secondary">
+            检测到 <span className="font-medium">{pendingGroupSkills.length}</span> 个 Skills，是否将其归为一组？
+          </p>
+          <div>
+            <label className="block text-xs font-normal text-text-secondary mb-1">组名</label>
+            <Input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && handleConfirmGroup()}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowGroupDialog(false)}>
+              不分组
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleConfirmGroup}>
+              确认分组
+            </Button>
           </div>
         </div>
-      )}
+      </Dialog>
 
       {/* GitHub import conflict dialog */}
-      {showConflictDialog && currentConflict && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-2xl w-96 flex flex-col">
-            <div className="px-5 py-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">Skill 已存在</h3>
-            </div>
-            <div className="px-5 py-4 space-y-2">
-              <p className="text-sm text-[#1d1d1f]">
-                <span className="font-medium">「{currentConflict.skill_name}」</span>
+      <Dialog open={showConflictDialog && !!currentConflict} onClose={handleConflictSkip} width="w-96">
+        {currentConflict && (
+          <div className="p-6 flex flex-col gap-4">
+            <h3 className="text-[14px] font-normal text-text-primary">Skill 已存在</h3>
+            <div className="flex flex-col gap-1">
+              <p className="text-[13px] text-text-secondary">
+                「{currentConflict.skill_name}」
                 {currentConflict.has_git
                   ? " 已存在，且包含 Git 仓库，要拉取最新版本吗？"
                   : " 已存在（无 Git 仓库），要创建为新 Skill 吗？"}
               </p>
               {pendingConflicts.length > 0 && (
-                <p className="text-xs text-[#86868b]">还有 {pendingConflicts.length} 个冲突待处理</p>
+                <p className="text-xs text-text-tertiary">还有 {pendingConflicts.length} 个冲突待处理</p>
               )}
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
-              <button
-                onClick={handleConflictSkip}
-                className="text-sm px-4 py-1.5 rounded-md border border-gray-300 text-[#424245] hover:bg-gray-50"
-              >
-                跳过
-              </button>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={handleConflictSkip}>跳过</Button>
               {currentConflict.has_git ? (
-                <button
-                  onClick={handleConflictPull}
-                  className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245]"
-                >
-                  拉取更新
-                </button>
+                <Button variant="primary" size="sm" onClick={handleConflictPull}>拉取更新</Button>
               ) : (
-                <button
-                  onClick={handleConflictCreate}
-                  className="text-sm px-4 py-1.5 rounded-md bg-[#1d1d1f] text-white hover:bg-[#424245]"
-                >
-                  创建新 Skill
-                </button>
+                <Button variant="primary" size="sm" onClick={handleConflictCreate}>创建新 Skill</Button>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Dialog>
 
-      {showSettings && (
-        <SettingsPanel
-          onClose={() => setShowSettings(false)}
-          onSkillsCleared={() => {
-            setShowSettings(false);
-            onSkillsCleared?.();
-          }}
-        />
-      )}
-      {showCreateProject && (
-        <CreateProjectDialog
-          onCreated={handleProjectCreated}
-          onClose={() => setShowCreateProject(false)}
-        />
-      )}
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSkillsCleared={() => {
+          setShowSettings(false);
+          loadData();
+          onSkillsCleared?.();
+        }}
+        onSkillsImported={() => loadData()}
+      />
+      <CreateProjectDialog
+        open={showCreateProject}
+        onCreated={handleProjectCreated}
+        onClose={() => setShowCreateProject(false)}
+      />
     </>
   );
-}
-
-function getRepoName(skill: Skill, gitInfo?: GitInfo): string | null {
-  if (skill.source_type === "Github" && skill.github_url) {
-    const parts = skill.github_url.replace(/\.git$/, "").split("/");
-    return parts[parts.length - 1] || null;
-  }
-  if (gitInfo?.is_git_repo) {
-    if (gitInfo.remote_url) {
-      const parts = gitInfo.remote_url.replace(/\.git$/, "").split("/");
-      return parts[parts.length - 1] || null;
-    }
-    const parts = skill.source_path.replace(/\/$/, "").split("/");
-    return parts[parts.length - 1] || null;
-  }
-  return null;
 }
 
 function SkillItem({
   skill,
   selected,
   onSelect,
-  gitInfo,
   indent = false,
 }: {
   skill: Skill;
   selected: boolean;
   onSelect: () => void;
-  gitInfo?: GitInfo;
   indent?: boolean;
 }) {
-  const repoName = getRepoName(skill, gitInfo);
+  const [isDragging, setIsDragging] = useState(false);
+
+  function getSourceLabel(): string {
+    if (skill.source_type === "Github") return "GitHub";
+    if (skill.has_git) return "本地 · GitHub";
+    return "本地";
+  }
+
   return (
     <button
       onClick={onSelect}
       draggable
       onDragStart={(e) => {
+        setIsDragging(true);
         e.dataTransfer.setData("skill-id", skill.id);
         e.dataTransfer.effectAllowed = "copy";
         (window as unknown as Record<string, string>)["__draggedSkillId"] = skill.id;
       }}
-      className={`w-full text-left py-1.5 text-sm transition-colors flex flex-col ${
+      onDragEnd={() => setIsDragging(false)}
+      className={`relative w-full text-left py-1.5 text-sm transition-colors flex flex-col ${
         indent ? "px-7" : "px-5"
       } ${
         selected
-          ? "bg-white text-[#1d1d1f] font-medium"
-          : "text-[#424245] hover:bg-white/60"
-      }`}
+          ? "bg-bg-base text-text-primary font-medium before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-accent-warm before:rounded-r-full"
+          : "text-text-secondary hover:bg-bg-elevated/60"
+      } ${isDragging ? "animate-[drag-breathe_1.5s_ease-in-out_infinite]" : ""}`}
     >
-      <div className="flex items-center justify-between w-full gap-1">
-        <span className="truncate flex-1 text-xs">{skill.name}</span>
-        <span className="flex items-center gap-0.5 shrink-0">
-          {skill.source_type !== "Github" && (
-            <span className="text-[8px] text-[#86868b] bg-gray-200/80 px-1 py-0.5 rounded leading-none">本地</span>
-          )}
-          {(skill.has_git || skill.source_type === "Github") && (
-            <span className="text-[8px] text-blue-500 bg-blue-50 px-1 py-0.5 rounded leading-none">Github</span>
-          )}
-        </span>
-      </div>
-      {repoName && (
-        <span className="text-[10px] text-[#86868b] truncate w-full leading-tight">
-          {repoName}
-        </span>
-      )}
+      <span className="truncate text-xs">{skill.name}</span>
+      <span className="text-[10px] text-text-tertiary leading-tight">{getSourceLabel()}</span>
     </button>
   );
 }
-
