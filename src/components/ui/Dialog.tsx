@@ -42,6 +42,10 @@ export function Dialog({ open, onClose, children, width = "w-96" }: DialogProps)
     return () => document.removeEventListener("keydown", handler);
   }, [mounted, onClose]);
 
+  useEffect(() => {
+    if (state === "open") contentRef.current?.focus();
+  }, [state]);
+
   if (!mounted) return null;
 
   return (
@@ -60,6 +64,9 @@ export function Dialog({ open, onClose, children, width = "w-96" }: DialogProps)
       {/* Content */}
       <div
         ref={contentRef}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         data-state={state}
         className={[
           "relative bg-bg-surface rounded-lg shadow-[var(--shadow-lg)] flex flex-col max-h-[85vh]",

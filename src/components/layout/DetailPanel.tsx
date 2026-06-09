@@ -170,14 +170,14 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
 
                 {/* 方式 3：GitHub */}
                 <div className="flex flex-col gap-1">
-                  <p className="text-[13px] text-text-secondary">从 Github 导入：</p>
+                  <p className="text-[13px] text-text-secondary">从 GitHub 导入：</p>
                   <Button
                     variant="primary"
                     size="sm"
                     className="self-start"
                     onClick={() => onImport?.("github")}
                   >
-                    输入 Github 链接并导入
+                    输入 GitHub 链接并导入
                   </Button>
                 </div>
 

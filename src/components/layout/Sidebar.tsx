@@ -601,7 +601,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                   : "border-transparent text-text-tertiary hover:text-text-secondary"
               }`}
             >
-              {tab === "local" ? "本地文件夹" : "Github 仓库"}
+              {tab === "local" ? "本地文件夹" : "GitHub 仓库"}
             </button>
           ))}
         </div>
@@ -874,8 +874,8 @@ function SkillItem({
   const [isDragging, setIsDragging] = useState(false);
 
   function getSourceLabel(): string {
-    if (skill.source_type === "Github") return "Github";
-    if (skill.has_git) return "本地 · Github";
+    if (skill.source_type === "Github") return "GitHub";
+    if (skill.has_git) return "本地 · GitHub";
     return "本地";
   }
 

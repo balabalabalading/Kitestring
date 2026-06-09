@@ -24,8 +24,8 @@ interface Props {
   tools: Tool[];
   allDists: Distribution[];
   getToolProjectPath: (tool: Tool) => string;
-  onDistribute: (skillId: string, tool: Tool) => void;
-  onRemoveDist: (distId: string) => void;
+  onDistribute: (skillId: string, tool: Tool) => Promise<void> | void;
+  onRemoveDist: (distId: string) => Promise<void> | void;
   onSelectSkill?: (skill: Skill) => void;
 }
 
@@ -43,6 +43,7 @@ export default function DistributionMatrix({
   skills, tools, allDists, getToolProjectPath, onDistribute, onRemoveDist, onSelectSkill,
 }: Props) {
   const [openPopover, setOpenPopover] = useState<Tool | null>(null);
+  const [busyTool, setBusyTool] = useState<Tool | null>(null);
 
   function getCell(skill: Skill, tool: Tool): CellInfo {
     const toolPath = getToolProjectPath(tool);
@@ -76,18 +77,32 @@ export default function DistributionMatrix({
     return d.entry_type === "Symlink" ? "symlink" : "folder";
   }
 
-  function handleDistributeAll(tool: Tool) {
-    skills.forEach((skill) => {
-      const { type } = getCell(skill, tool);
-      if (type === "none") onDistribute(skill.id, tool);
-    });
+  async function handleDistributeAll(tool: Tool) {
+    if (busyTool) return;
+    setBusyTool(tool);
+    try {
+      for (const skill of skills) {
+        const { type } = getCell(skill, tool);
+        if (type === "none") await onDistribute(skill.id, tool);
+      }
+    } finally {
+      setBusyTool(null);
+      setOpenPopover(null);
+    }
   }
 
-  function handleRemoveAll(tool: Tool) {
-    skills.forEach((skill) => {
-      const { type, dist } = getCell(skill, tool);
-      if ((type === "linked" || type === "broken") && dist?.id) onRemoveDist(dist.id);
-    });
+  async function handleRemoveAll(tool: Tool) {
+    if (busyTool) return;
+    setBusyTool(tool);
+    try {
+      for (const skill of skills) {
+        const { type, dist } = getCell(skill, tool);
+        if ((type === "linked" || type === "broken") && dist?.id) await onRemoveDist(dist.id);
+      }
+    } finally {
+      setBusyTool(null);
+      setOpenPopover(null);
+    }
   }
 
   if (skills.length === 0) {
@@ -115,7 +130,8 @@ export default function DistributionMatrix({
               </span>
               {/* Three-dot menu button */}
               <button
-                className="shrink-0 flex items-center justify-center w-[18px] h-[18px] rounded hover:bg-bg-surface transition-colors"
+                className="shrink-0 flex items-center justify-center w-[18px] h-[18px] rounded hover:bg-bg-surface transition-colors disabled:opacity-50"
+                disabled={busyTool !== null}
                 onClick={(e) => { e.stopPropagation(); setOpenPopover(openPopover === tool ? null : tool); }}
               >
                 <ThreeDots />
@@ -124,16 +140,18 @@ export default function DistributionMatrix({
               {openPopover === tool && (
                 <div className="absolute top-full right-0 z-50 bg-bg-elevated border border-border-default rounded-[8px] shadow-md py-1 min-w-[108px]">
                   <button
-                    className="w-full text-left px-3 py-1.5 text-[12px] text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors"
-                    onClick={(e) => { e.stopPropagation(); handleDistributeAll(tool); setOpenPopover(null); }}
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors disabled:opacity-50"
+                    disabled={busyTool !== null}
+                    onClick={(e) => { e.stopPropagation(); void handleDistributeAll(tool); }}
                   >
-                    全部分发
+                    {busyTool === tool ? "处理中..." : "全部分发"}
                   </button>
                   <button
-                    className="w-full text-left px-3 py-1.5 text-[12px] text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors"
-                    onClick={(e) => { e.stopPropagation(); handleRemoveAll(tool); setOpenPopover(null); }}
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors disabled:opacity-50"
+                    disabled={busyTool !== null}
+                    onClick={(e) => { e.stopPropagation(); void handleRemoveAll(tool); }}
                   >
-                    全部取消
+                    {busyTool === tool ? "处理中..." : "全部取消"}
                   </button>
                 </div>
               )}

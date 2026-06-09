@@ -64,7 +64,7 @@ function FileTreeNode({ node, onFileSelect, selectedPath, depth }: FileTreeNodeP
       onClick={() => onFileSelect(node.path)}
       className={`w-full text-left h-6 rounded-sm flex items-center gap-1.5 transition-colors ${
         selectedPath === node.path
-          ? "bg-[#2C3048] text-accent-warm"
+          ? "bg-bg-hover text-accent-warm"
           : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
       }`}
       style={{ paddingLeft: `${depth * 16 + 16}px` }}

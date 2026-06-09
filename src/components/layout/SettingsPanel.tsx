@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ToolPaths } from "../../types";
 import * as tauri from "../../lib/tauri";
 import { Dialog } from "../ui/Dialog";
@@ -45,6 +45,8 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
   const [keepSymlinksOnClear, setKeepSymlinksOnClear] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [discoverResult, setDiscoverResult] = useState<string | null>(null);
+  const didLoadPathsRef = useRef(false);
+  const didLoadIgnoredPathsRef = useRef(false);
 
   useEffect(() => {
     tauri.getAppConfig().then((config) => {
@@ -60,12 +62,23 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
   // 实时保存：paths 变化时自动保存
   useEffect(() => {
     if (loading) return;
-    tauri.updateToolPaths(paths).catch((e) => setError(String(e)));
+    if (!didLoadPathsRef.current) {
+      didLoadPathsRef.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      tauri.updateToolPaths(paths).catch((e) => setError(String(e)));
+    }, 250);
+    return () => window.clearTimeout(timer);
   }, [paths, loading]);
 
   // 实时保存：ignoredPaths 变化时自动保存
   useEffect(() => {
     if (loading) return;
+    if (!didLoadIgnoredPathsRef.current) {
+      didLoadIgnoredPathsRef.current = true;
+      return;
+    }
     tauri.updateIgnoredPaths(ignoredPaths).catch((e) => setError(String(e)));
   }, [ignoredPaths, loading]);
 
@@ -163,7 +176,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                   ? "text-text-primary font-bold border-accent-sky"
                   : "text-text-tertiary hover:text-text-secondary border-transparent"
               }`}
-              style={settingsTab === item.id ? { backgroundColor: "#212335" } : undefined}
+              style={settingsTab === item.id ? { backgroundColor: "color-mix(in srgb, var(--accent-sky) 10%, transparent)" } : undefined}
             >
               {item.label}
             </button>
@@ -268,7 +281,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                 />
                 <button
                   onClick={addIgnoredPath}
-                  className="h-8 px-3 text-[11px] text-text-secondary bg-bg-raised rounded-sm hover:text-text-primary transition-colors shrink-0"
+                  className="h-8 px-3 text-[11px] text-text-secondary bg-bg-elevated rounded-sm hover:text-text-primary transition-colors shrink-0"
                 >
                   添加
                 </button>
@@ -342,7 +355,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
               <div className="text-[11px] text-text-tertiary">Copyright 2026 Kitestring</div>
               <div className="text-sm font-bold text-text-primary">联系我</div>
               <div className="text-[11px] font-semibold text-text-secondary whitespace-pre-line">
-                {"我的邮箱：huz00036@gmail.com\nGithub 仓库地址：https://github.com/balabalabalading/Kitestring"}
+                {"我的邮箱：huz00036@gmail.com\nGitHub 仓库地址：https://github.com/balabalabalading/Kitestring"}
               </div>
             </>
           )}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 interface DrawerProps {
   open: boolean;
@@ -9,6 +9,7 @@ interface DrawerProps {
 export function Drawer({ open, onClose, children }: DrawerProps) {
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<"closed" | "open">("closed");
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -36,6 +37,10 @@ export function Drawer({ open, onClose, children }: DrawerProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [mounted, onClose]);
 
+  useEffect(() => {
+    if (state === "open") panelRef.current?.focus();
+  }, [state]);
+
   if (!mounted) return null;
 
   return (
@@ -51,6 +56,10 @@ export function Drawer({ open, onClose, children }: DrawerProps) {
 
       {/* Panel */}
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         data-state={state}
         className={[
           "relative w-[var(--drawer-width)] h-full bg-bg-surface shadow-[var(--shadow-lg)] flex flex-col",
