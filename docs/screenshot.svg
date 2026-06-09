@@ -1,0 +1,47 @@
+<svg width="1280" height="800" viewBox="0 0 1280 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="800" fill="#F7F4EE"/>
+  <rect x="64" y="54" width="1152" height="692" rx="18" fill="#1F2527"/>
+  <rect x="64" y="54" width="1152" height="692" rx="18" stroke="#D7CEC0" stroke-width="2"/>
+  <rect x="86" y="78" width="300" height="644" rx="12" fill="#F3EFE7"/>
+  <rect x="414" y="78" width="778" height="644" rx="12" fill="#FFFDF8"/>
+  <text x="116" y="126" fill="#1F2527" font-family="Arial, sans-serif" font-size="32" font-weight="700">Kitestring</text>
+  <rect x="116" y="158" width="238" height="42" rx="8" fill="#FFFFFF"/>
+  <text x="136" y="185" fill="#6F6A61" font-family="Arial, sans-serif" font-size="16">Search skills</text>
+  <text x="116" y="244" fill="#8A8174" font-family="Arial, sans-serif" font-size="13" font-weight="700">SKILLS</text>
+  <rect x="108" y="264" width="258" height="58" rx="8" fill="#E7DFD3"/>
+  <circle cx="132" cy="293" r="7" fill="#D9824B"/>
+  <text x="152" y="288" fill="#1F2527" font-family="Arial, sans-serif" font-size="16" font-weight="700">writing-assistant</text>
+  <text x="152" y="308" fill="#6F6A61" font-family="Arial, sans-serif" font-size="12">Local · GitHub</text>
+  <rect x="108" y="336" width="258" height="58" rx="8" fill="#FFFFFF"/>
+  <circle cx="132" cy="365" r="7" fill="#75A99C"/>
+  <text x="152" y="360" fill="#1F2527" font-family="Arial, sans-serif" font-size="16" font-weight="700">code-review</text>
+  <text x="152" y="380" fill="#6F6A61" font-family="Arial, sans-serif" font-size="12">GitHub</text>
+  <rect x="108" y="408" width="258" height="58" rx="8" fill="#FFFFFF"/>
+  <circle cx="132" cy="437" r="7" fill="#8AA0B4"/>
+  <text x="152" y="432" fill="#1F2527" font-family="Arial, sans-serif" font-size="16" font-weight="700">release-notes</text>
+  <text x="152" y="452" fill="#6F6A61" font-family="Arial, sans-serif" font-size="12">Local</text>
+  <rect x="116" y="652" width="112" height="42" rx="8" fill="#FFF8F0"/>
+  <text x="141" y="678" fill="#B95C2E" font-family="Arial, sans-serif" font-size="14" font-weight="700">Settings</text>
+  <rect x="238" y="652" width="116" height="42" rx="8" fill="#D9824B"/>
+  <text x="260" y="678" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="14" font-weight="700">Import Skill</text>
+  <text x="454" y="132" fill="#1F2527" font-family="Arial, sans-serif" font-size="34" font-weight="700">writing-assistant</text>
+  <text x="454" y="166" fill="#6F6A61" font-family="Arial, sans-serif" font-size="16">Manage metadata, preview files, and distribute this Skill to AI tools.</text>
+  <rect x="454" y="212" width="700" height="118" rx="10" fill="#F4EFE7"/>
+  <text x="482" y="252" fill="#1F2527" font-family="Arial, sans-serif" font-size="18" font-weight="700">Distribution</text>
+  <rect x="482" y="274" width="142" height="34" rx="8" fill="#1F2527"/>
+  <text x="510" y="296" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="13" font-weight="700">Claude Code</text>
+  <rect x="638" y="274" width="116" height="34" rx="8" fill="#D9824B"/>
+  <text x="668" y="296" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="13" font-weight="700">Codex</text>
+  <rect x="768" y="274" width="136" height="34" rx="8" fill="#FFFFFF"/>
+  <text x="800" y="296" fill="#6F6A61" font-family="Arial, sans-serif" font-size="13" font-weight="700">Gemini CLI</text>
+  <rect x="454" y="356" width="336" height="302" rx="10" fill="#F9F6F0"/>
+  <text x="482" y="394" fill="#1F2527" font-family="Arial, sans-serif" font-size="18" font-weight="700">Files</text>
+  <text x="482" y="430" fill="#6F6A61" font-family="Arial, sans-serif" font-size="15">SKILL.md</text>
+  <text x="482" y="466" fill="#6F6A61" font-family="Arial, sans-serif" font-size="15">references/</text>
+  <text x="482" y="502" fill="#6F6A61" font-family="Arial, sans-serif" font-size="15">scripts/</text>
+  <rect x="818" y="356" width="336" height="302" rx="10" fill="#1F2527"/>
+  <text x="846" y="394" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="18" font-weight="700">SKILL.md</text>
+  <text x="846" y="430" fill="#D7CEC0" font-family="Arial, sans-serif" font-size="14">name: writing-assistant</text>
+  <text x="846" y="462" fill="#D7CEC0" font-family="Arial, sans-serif" font-size="14">description: Draft and refine</text>
+  <text x="846" y="494" fill="#D7CEC0" font-family="Arial, sans-serif" font-size="14">agent-facing writing workflows.</text>
+</svg>
