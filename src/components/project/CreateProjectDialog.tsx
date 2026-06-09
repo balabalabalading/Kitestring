@@ -5,6 +5,8 @@ import * as tauri from "../../lib/tauri";
 import { Dialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
+import { useI18n } from "../../i18n/I18nProvider";
+import { translateError } from "../../i18n/errors";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -13,6 +15,7 @@ interface CreateProjectDialogProps {
 }
 
 export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }: CreateProjectDialogProps) {
+  const { locale, t } = useI18n();
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,11 +35,11 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
 
   async function handleCreate() {
     if (!path.trim()) {
-      setError("请选择项目目录");
+      setError(t("projectDialog.errorNoPath"));
       return;
     }
     if (!name.trim()) {
-      setError("请输入项目名称");
+      setError(t("projectDialog.errorNoName"));
       return;
     }
     setLoading(true);
@@ -45,7 +48,7 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
       const project = await tauri.createProject(name.trim(), path.trim());
       onCreated(project);
     } catch (e) {
-      setError(String(e));
+      setError(translateError(e, locale));
     } finally {
       setLoading(false);
     }
@@ -55,7 +58,7 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
     <Dialog open={isOpen} onClose={onClose}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-        <h2 className="text-sm font-normal text-text-primary">导入项目</h2>
+        <h2 className="text-sm font-normal text-text-primary">{t("projectDialog.title")}</h2>
         <Button variant="icon" onClick={onClose}>×</Button>
       </div>
 
@@ -63,30 +66,30 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
       <div className="px-5 py-4 space-y-3">
         <div>
           <label className="block text-xs font-normal text-text-secondary mb-1">
-            项目目录
+            {t("projectDialog.directory")}
           </label>
           <div className="flex gap-2">
             <Input
               mono
               value={path}
               onChange={(e) => setPath(e.target.value)}
-              placeholder="请输入项目路径，或点击按钮选择"
+              placeholder={t("projectDialog.pathPlaceholder")}
               className="flex-1"
             />
             <Button variant="secondary" size="sm" onClick={handlePickDir}>
-              选择
+              {t("projectDialog.pick")}
             </Button>
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-normal text-text-secondary mb-1">
-            项目名称
+            {t("projectDialog.name")}
           </label>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="我的项目"
+            placeholder={t("projectDialog.namePlaceholder")}
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           />
@@ -104,9 +107,9 @@ export default function CreateProjectDialog({ open: isOpen, onCreated, onClose }
 
       {/* Footer */}
       <div className="flex justify-end gap-2 px-5 py-4 border-t border-border-subtle">
-        <Button variant="secondary" size="sm" onClick={onClose}>返回</Button>
+        <Button variant="secondary" size="sm" onClick={onClose}>{t("common.back")}</Button>
         <Button variant="primary" size="sm" onClick={handleCreate} disabled={loading}>
-          {loading ? "创建中..." : "创建"}
+          {loading ? t("common.creating") : t("common.create")}
         </Button>
       </div>
     </Dialog>

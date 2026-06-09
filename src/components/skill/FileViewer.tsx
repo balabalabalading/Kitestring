@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import * as tauri from "../../lib/tauri";
+import { useI18n } from "../../i18n/I18nProvider";
+import { translateError } from "../../i18n/errors";
 
 interface FileViewerProps {
   skillId: string;
@@ -7,6 +9,7 @@ interface FileViewerProps {
 }
 
 export default function FileViewer({ skillId, relativePath }: FileViewerProps) {
+  const { locale, t } = useI18n();
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,14 +23,14 @@ export default function FileViewer({ skillId, relativePath }: FileViewerProps) {
         setContent(text);
         setError(null);
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(translateError(e, locale)))
       .finally(() => setLoading(false));
-  }, [skillId, relativePath]);
+  }, [skillId, relativePath, locale]);
 
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-xs text-text-tertiary">
-        加载中...
+        {t("common.loading")}
       </div>
     );
   }
