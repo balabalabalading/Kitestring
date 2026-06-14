@@ -27,6 +27,9 @@ uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 git2 = "0.20"
+# Force libgit2/openssl users to link OpenSSL statically so the signed macOS
+# app does not depend on Homebrew dylibs that Gatekeeper refuses to load.
+openssl-sys = { version = "0.9", features = ["vendored"] }
 
 [dev-dependencies]
 tempfile = "3"
