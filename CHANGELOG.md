@@ -18,10 +18,11 @@
 - 支持 Skill 文件树浏览与文件内容预览。
 - 支持 Skill 分组、搜索和项目管理。
 - 支持中文和英文界面文本。
+- 提供 macOS、Windows 和 Linux 预构建安装包。
 
 ### 已知限制
 
-- 首发预构建产物优先覆盖 macOS；Windows/Linux 可从源码构建。
+- Windows 安装包暂未代码签名，Windows 10+ 需要系统已安装 WebView2。
 - 配置文件 `~/.kitestring/config.json` 在 Early Preview 阶段不承诺格式稳定。
 - Git 拉取仅支持干净工作区下的 fast-forward 更新。
 - `SKILL.md` front matter 使用轻量解析器，不是完整 YAML 解析器。
