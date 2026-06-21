@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Skill, Distribution, GitInfo, Tool, DistStatus, AppConfig } from "../../types";
 import { TOOL_DISPLAY_NAMES } from "../../types";
 import * as tauri from "../../lib/tauri";
@@ -11,6 +11,8 @@ import { Tag } from "../ui/Tag";
 import { useToast } from "../ui/Toast";
 import { useI18n } from "../../i18n/I18nProvider";
 import { translateError } from "../../i18n/errors";
+import type { DiagnosticItem, DiagnosticReport } from "../../lib/tauri";
+import { getSkillDiagnostics } from "../../lib/diagnostics";
 
 
 interface DetailPanelProps {
@@ -21,11 +23,13 @@ interface DetailPanelProps {
   onImport?: (tab: "local" | "github") => void;
   onDiscover?: () => void;
   onCreateProject?: () => void;
+  onDiagnosticsChanged: () => Promise<tauri.DiagnosticReport>;
+  diagnosticReport: DiagnosticReport | null;
 }
 
 const TOOLS: Tool[] = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"];
 
-export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, onSkillPulled, onImport, onDiscover, onCreateProject }: DetailPanelProps) {
+export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, onSkillPulled, onImport, onDiscover, onCreateProject, onDiagnosticsChanged, diagnosticReport }: DetailPanelProps) {
   const [distributions, setDistributions] = useState<Distribution[]>([]);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [files, setFiles] = useState<tauri.FileNode[]>([]);
@@ -40,6 +44,9 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
   const [customPathInput, setCustomPathInput] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [keepSymlinks, setKeepSymlinks] = useState(false);
+  const [highlightedTool, setHighlightedTool] = useState<{ tool: Tool; level: "error" | "warning" } | null>(null);
+  const toolCardRefs = useRef(new Map<Tool, HTMLDivElement>());
+  const highlightTimerRef = useRef<number | null>(null);
 
   const { showToast } = useToast();
   const { locale, t } = useI18n();
@@ -57,8 +64,17 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       setAddingPathTool(null);
       setCustomPathInput("");
       setConfirmDelete(false);
+      setHighlightedTool(null);
+      if (highlightTimerRef.current !== null) {
+        window.clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = null;
+      }
     }
   }, [skill]);
+
+  useEffect(() => () => {
+    if (highlightTimerRef.current !== null) window.clearTimeout(highlightTimerRef.current);
+  }, []);
 
   // Load data when skill changes or after a reload is triggered
   useEffect(() => {
@@ -236,6 +252,48 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
   }
 
   const skillDists = distributions.filter((d) => d.skill_id === skill.id);
+  const skillDiagnosticItems = getSkillDiagnostics(diagnosticReport, skill.id);
+  const sourceMissingItem = skillDiagnosticItems.find((item) => item.code === "skill_source_missing") ?? null;
+  const brokenDiagnosticItems = skillDiagnosticItems.filter((item) => item.code === "distribution_broken");
+  const pendingDiagnosticItems = skillDiagnosticItems.filter((item) => item.code === "distribution_pending");
+  const hasDiagnosticError = sourceMissingItem !== null || brokenDiagnosticItems.length > 0;
+
+  function getDiagnosticTool(item: DiagnosticItem): Tool | null {
+    const distribution = item.distribution_id
+      ? skillDists.find((dist) => dist.id === item.distribution_id)
+      : null;
+    if (distribution) return distribution.tool;
+    return TOOLS.find((tool) => tool === item.tool || TOOL_DISPLAY_NAMES[tool] === item.tool) ?? null;
+  }
+
+  function getDiagnosticTools(items: DiagnosticItem[]): Tool[] {
+    const itemTools = new Set(items.map(getDiagnosticTool).filter((tool): tool is Tool => tool !== null));
+    return TOOLS.filter((tool) => itemTools.has(tool));
+  }
+
+  const brokenTools = getDiagnosticTools(brokenDiagnosticItems);
+  const pendingTools = getDiagnosticTools(pendingDiagnosticItems);
+  const hasLocatableDistributionIssue = brokenTools.length > 0 || pendingTools.length > 0;
+
+  function formatToolNames(tools: Tool[], items: DiagnosticItem[]): string {
+    const names = tools.length > 0
+      ? tools.map((tool) => TOOL_DISPLAY_NAMES[tool])
+      : [...new Set(items.map((item) => item.tool).filter((tool): tool is string => Boolean(tool)))];
+    return names.join(locale === "zh-CN" ? "、" : ", ");
+  }
+
+  function locateDistributionIssue() {
+    const targetTool = brokenTools[0] ?? pendingTools[0];
+    if (!targetTool) return;
+    const level = brokenTools.includes(targetTool) ? "error" : "warning";
+    toolCardRefs.current.get(targetTool)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedTool({ tool: targetTool, level });
+    if (highlightTimerRef.current !== null) window.clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = window.setTimeout(() => {
+      setHighlightedTool(null);
+      highlightTimerRef.current = null;
+    }, 1600);
+  }
 
   function statusStyle(status: DistStatus | "none"): { backgroundColor: string } {
     switch (status) {
@@ -348,6 +406,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
     try {
       const dist = await tauri.distributeSkill(skill.id, tool, scope);
       setDistributions((prev) => [...prev, dist]);
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       setDistError(translateError(e, locale));
     }
@@ -361,6 +420,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
       setDistributions((prev) => [...prev, dist]);
       setAddingPathTool(null);
       setCustomPathInput("");
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       setDistError(translateError(e, locale));
     }
@@ -370,6 +430,7 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
     try {
       await tauri.removeDistribution(distId);
       setDistributions((prev) => prev.filter((d) => d.id !== distId));
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       console.error("Remove distribution failed:", e);
     }
@@ -488,6 +549,64 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
         </div>
       </div>
 
+      {skillDiagnosticItems.length > 0 && (
+        <div
+          role="alert"
+          className={`flex flex-wrap items-start gap-3 border-l-2 rounded-sm px-4 py-3 shrink-0 ${
+            hasDiagnosticError
+              ? "border-status-broken bg-status-broken/8"
+              : "border-status-pending bg-status-pending/8"
+          }`}
+        >
+          <svg
+            className={`w-4 h-4 mt-0.5 shrink-0 ${hasDiagnosticError ? "text-status-broken" : "text-status-pending"}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.3 4.7L2.9 17.5A1.7 1.7 0 004.4 20h15.2a1.7 1.7 0 001.5-2.5L13.7 4.7a1.7 1.7 0 00-3.4 0z" />
+          </svg>
+          <div className="flex-1 min-w-[220px]">
+            <div className={`text-[12px] font-semibold ${hasDiagnosticError ? "text-status-broken" : "text-status-pending"}`}>
+              {sourceMissingItem
+                ? t("detail.diagnostic.sourceMissingTitle")
+                : brokenDiagnosticItems.length > 0
+                  ? t("detail.diagnostic.brokenTitle")
+                  : t("detail.diagnostic.pendingTitle")}
+            </div>
+            <div className="mt-1 flex flex-col gap-0.5 text-[11px] text-text-secondary leading-relaxed">
+              {sourceMissingItem && (
+                <div className="break-all">
+                  {t("detail.diagnostic.sourcePath", { path: sourceMissingItem.path ?? skill.source_path })}
+                </div>
+              )}
+              {brokenDiagnosticItems.length > 0 && (
+                <div>
+                  {t("detail.diagnostic.brokenSummary", {
+                    count: brokenDiagnosticItems.length,
+                    tools: formatToolNames(brokenTools, brokenDiagnosticItems),
+                  })}
+                </div>
+              )}
+              {pendingDiagnosticItems.length > 0 && (
+                <div>
+                  {t("detail.diagnostic.pendingSummary", {
+                    count: pendingDiagnosticItems.length,
+                    tools: formatToolNames(pendingTools, pendingDiagnosticItems),
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          {hasLocatableDistributionIssue && (
+            <Button variant="secondary" size="sm" onClick={locateDistributionIssue} className="shrink-0 ml-7 sm:ml-0">
+              {t("detail.diagnostic.locate")}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Tools section */}
       <div className="flex flex-col gap-2">
         <p className="text-[11px] font-semibold text-text-primary">{t("common.tools")}</p>
@@ -508,7 +627,20 @@ export default function DetailPanel({ skill, totalSkillsCount, onSkillDeleted, o
             const extraGlobals = getExpandedExtraGlobals(tool);
             const projRelPath = getProjectRelativeSourcePath(tool);
             return (
-              <Card key={tool} variant="tool">
+              <Card
+                key={tool}
+                ref={(node) => {
+                  if (node) toolCardRefs.current.set(tool, node);
+                  else toolCardRefs.current.delete(tool);
+                }}
+                variant="tool"
+                className={highlightedTool?.tool === tool
+                  ? highlightedTool.level === "error"
+                    ? "ring-2 ring-status-broken ring-offset-2 ring-offset-bg-base"
+                    : "ring-2 ring-status-pending ring-offset-2 ring-offset-bg-base"
+                  : ""
+                }
+              >
                 {/* Tool card header */}
                 <div className="flex items-center justify-between px-6 py-2 bg-bg-surface">
                   <span className="text-[13px] font-semibold text-text-primary">{TOOL_DISPLAY_NAMES[tool]}</span>

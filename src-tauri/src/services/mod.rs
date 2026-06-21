@@ -1,3 +1,4 @@
+pub mod diagnostics;
 pub mod distributor;
 pub mod git_service;
 pub mod importer;

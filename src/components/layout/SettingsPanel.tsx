@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { ToolPaths } from "../../types";
+import type { DiagnosticItem, DiagnosticReport, DiagnosticLevel } from "../../lib/tauri";
 import * as tauri from "../../lib/tauri";
 import { Dialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
@@ -15,6 +16,10 @@ interface SettingsPanelProps {
   onClose: () => void;
   onSkillsCleared?: () => void;
   onSkillsImported?: () => void;
+  diagnosticReport: DiagnosticReport | null;
+  diagnosing: boolean;
+  onRunDiagnostics: () => Promise<DiagnosticReport>;
+  onDiagnosticsChanged: () => Promise<DiagnosticReport>;
 }
 
 const TOOLS = ["ClaudeCode", "CopilotCLI", "GeminiCLI", "Codex", "AgentFolder"] as const;
@@ -36,7 +41,7 @@ const NAV_ITEMS: { id: SettingsTab; labelKey: TranslationKey }[] = [
   { id: "about", labelKey: "settings.nav.about" },
 ];
 
-export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkillsImported }: SettingsPanelProps) {
+export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkillsImported, diagnosticReport, diagnosing, onRunDiagnostics, onDiagnosticsChanged }: SettingsPanelProps) {
   const { mode, setMode } = useTheme();
   const { locale, setLocale, t } = useI18n();
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
@@ -50,8 +55,10 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
   const [keepSymlinksOnClear, setKeepSymlinksOnClear] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [discoverResult, setDiscoverResult] = useState<string | null>(null);
+  const [diagnosticExpanded, setDiagnosticExpanded] = useState(false);
   const didLoadPathsRef = useRef(false);
   const didLoadIgnoredPathsRef = useRef(false);
+  const previousAbnormalIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     tauri.getAppConfig().then((config) => {
@@ -72,10 +79,14 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       return;
     }
     const timer = window.setTimeout(() => {
-      tauri.updateToolPaths(paths).catch((e) => setRawError(String(e)));
+      tauri.updateToolPaths(paths)
+        .then(() => {
+          void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
+        })
+        .catch((e) => setRawError(String(e)));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [paths, loading]);
+  }, [paths, loading, onDiagnosticsChanged]);
 
   // 实时保存：ignoredPaths 变化时自动保存
   useEffect(() => {
@@ -116,6 +127,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
         : t("settings.noDiscoverResult")
       );
       if (skills.length > 0) onSkillsImported?.();
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       setRawError(String(e));
     } finally {
@@ -130,12 +142,37 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
       await tauri.deleteAllSkills(keepSymlinksOnClear);
       setConfirmClear(false);
       onSkillsCleared?.();
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       setRawError(String(e));
     } finally {
       setClearing(false);
     }
   }
+
+  async function handleRunDiagnostics() {
+    setRawError(null);
+    try {
+      await onRunDiagnostics();
+    } catch (e) {
+      setRawError(String(e));
+    }
+  }
+
+  useEffect(() => {
+    if (!diagnosticReport) return;
+    const abnormalIds = new Set(
+      diagnosticReport.items
+        .filter((item) => item.level !== "ok")
+        .map((item) => item.id)
+    );
+    const hasNewAbnormality = [...abnormalIds].some((id) => !previousAbnormalIdsRef.current.has(id));
+    if (hasNewAbnormality) setDiagnosticExpanded(true);
+    if (abnormalIds.size === 0 && previousAbnormalIdsRef.current.size === 0) {
+      setDiagnosticExpanded(false);
+    }
+    previousAbnormalIdsRef.current = abnormalIds;
+  }, [diagnosticReport]);
 
   const THEME_LABELS: Record<typeof mode, TranslationKey> = {
     system: "settings.theme.system",
@@ -146,6 +183,27 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
     { id: "zh-CN", labelKey: "settings.language.zh" },
     { id: "en-US", labelKey: "settings.language.en" },
   ];
+
+  function diagnosticTitle(item: DiagnosticItem): string {
+    return t(diagnosticTextKeys[item.code]?.title ?? "settings.diagnostic.unknownTitle", {
+      tool: item.tool ?? "",
+      skill: item.skill_name ?? "",
+      status: item.status ?? "",
+    });
+  }
+
+  function diagnosticMessage(item: DiagnosticItem): string {
+    return t(diagnosticTextKeys[item.code]?.message ?? "settings.diagnostic.unknownMessage", {
+      tool: item.tool ?? "",
+      skill: item.skill_name ?? "",
+      status: item.status ?? "",
+    });
+  }
+
+  function diagnosticAction(item: DiagnosticItem): string | null {
+    const actionKey = diagnosticTextKeys[item.code]?.action;
+    return actionKey ? t(actionKey) : null;
+  }
 
   const discoverContent = (
     <>
@@ -204,12 +262,12 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
             <>
               <div className="text-sm font-bold text-text-primary">{t("settings.general")}</div>
               <div className="text-[11px] font-semibold text-text-secondary">{t("settings.themeMode")}</div>
-              <div className="flex gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {(["system", "light", "dark"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setMode(m)}
-                    className={`flex-1 text-[11px] h-7 rounded-md flex items-center justify-center transition-colors border ${
+                    className={`text-[11px] h-7 rounded-md flex items-center justify-center transition-colors border ${
                       mode === m
                         ? "text-accent-sky border-accent-sky"
                         : "text-text-tertiary border-border-default hover:text-text-secondary"
@@ -221,12 +279,12 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                 ))}
               </div>
               <div className="text-[11px] font-semibold text-text-secondary">{t("settings.language")}</div>
-              <div className="flex gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {LANGUAGE_LABELS.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => setLocale(item.id)}
-                    className={`flex-1 text-[11px] h-7 rounded-md flex items-center justify-center transition-colors border ${
+                    className={`text-[11px] h-7 rounded-md flex items-center justify-center transition-colors border ${
                       locale === item.id
                         ? "text-accent-sky border-accent-sky"
                         : "text-text-tertiary border-border-default hover:text-text-secondary"
@@ -236,6 +294,86 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
                     {t(item.labelKey)}
                   </button>
                 ))}
+              </div>
+              <div className="h-px bg-border-subtle" />
+              <div className="text-[11px] font-semibold text-text-secondary">{t("settings.diagnostic.title")}</div>
+              <div className={`flex flex-col gap-2 rounded-md border px-3 py-[10px] ${diagnosticContainerClass(diagnosticReport)}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-text-tertiary">
+                      {t("settings.diagnostic.hint")}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRunDiagnostics}
+                    disabled={diagnosing}
+                    className="shrink-0"
+                  >
+                    {diagnosing ? t("settings.diagnostic.running") : t("settings.diagnostic.run")}
+                  </Button>
+                </div>
+                {diagnosticReport && (
+                  <>
+                    <div className="flex items-center gap-2 rounded-sm bg-bg-base/70 px-2 py-1.5">
+                      <div className="flex gap-2 min-w-0">
+                        <DiagnosticPill level="ok" label={t("settings.diagnostic.ok")} count={diagnosticReport.summary.ok} />
+                        <DiagnosticPill level="warning" label={t("settings.diagnostic.warning")} count={diagnosticReport.summary.warning} />
+                        <DiagnosticPill level="error" label={t("settings.diagnostic.error")} count={diagnosticReport.summary.error} />
+                      </div>
+                      <Button
+                        variant="icon"
+                        onClick={() => setDiagnosticExpanded((value) => !value)}
+                        className="ml-auto shrink-0"
+                        aria-expanded={diagnosticExpanded}
+                        title={diagnosticExpanded ? t("settings.diagnostic.collapse") : t("settings.diagnostic.expand")}
+                      >
+                        <svg className={`w-3.5 h-3.5 transition-transform ${diagnosticExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                        </svg>
+                      </Button>
+                    </div>
+                    {diagnosticExpanded && (
+                    <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                      {[...diagnosticReport.items].sort((a, b) => levelRank(b.level) - levelRank(a.level)).map((item) => {
+                        const action = diagnosticAction(item);
+                        return (
+                          <div
+                            key={item.id}
+                            className="rounded-sm border border-border-subtle bg-bg-base px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${diagnosticDotClass(item.level)}`} />
+                              <span className="text-[11px] font-semibold text-text-primary truncate">
+                                {diagnosticTitle(item)}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-text-tertiary mt-1">
+                              {diagnosticMessage(item)}
+                            </div>
+                            {item.path && (
+                              <div className="text-[10px] font-mono text-text-tertiary mt-1 truncate" title={item.path}>
+                                {item.path}
+                              </div>
+                            )}
+                            {item.detail && (
+                              <div className="text-[10px] text-status-broken mt-1 truncate" title={item.detail}>
+                                {item.detail}
+                              </div>
+                            )}
+                            {action && (
+                              <div className="text-[10px] text-text-secondary mt-1">
+                                {action}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    )}
+                  </>
+                )}
               </div>
               {discoverContent}
             </>
@@ -380,7 +518,7 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
               <div className="flex flex-col items-center gap-2 bg-bg-elevated rounded-lg px-5 pt-6 pb-6">
                 <div className="text-[22px] font-bold text-text-primary">Kitestring</div>
                 <div className="text-[12px] text-text-secondary">{t("settings.aboutDescription")}</div>
-                <div className="text-[11px] text-text-tertiary">v0.1.0</div>
+                <div className="text-[11px] text-text-tertiary">v0.1.1</div>
               </div>
               <div className="text-[11px] text-text-tertiary">Copyright 2026 Kitestring</div>
               <div className="text-sm font-bold text-text-primary">{t("settings.contact")}</div>
@@ -404,3 +542,118 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
     </Dialog>
   );
 }
+
+function diagnosticContainerClass(report: DiagnosticReport | null) {
+  if (!report) return "bg-bg-elevated border-transparent";
+  if (report.summary.error > 0) return "bg-status-broken/5 border-status-broken/25";
+  if (report.summary.warning > 0) return "bg-status-pending/5 border-status-pending/25";
+  return "bg-status-linked/5 border-status-linked/20";
+}
+
+function levelRank(level: DiagnosticLevel) {
+  if (level === "error") return 3;
+  if (level === "warning") return 2;
+  return 1;
+}
+
+function diagnosticDotClass(level: DiagnosticLevel) {
+  if (level === "error") return "bg-status-broken";
+  if (level === "warning") return "bg-status-pending";
+  return "bg-status-linked";
+}
+
+function DiagnosticPill({ level, label, count }: { level: DiagnosticLevel; label: string; count: number }) {
+  const colorClass = level === "error"
+    ? "text-status-broken border-status-broken/40"
+    : level === "warning"
+      ? "text-status-pending border-status-pending/40"
+      : "text-status-linked border-status-linked/40";
+  return (
+    <div className={`h-7 px-2 rounded-sm border bg-bg-base flex items-center gap-1.5 min-w-0 ${colorClass}`}>
+      <span className="text-[11px] font-semibold">{label}</span>
+      <span className="text-[11px] font-mono">{count}</span>
+    </div>
+  );
+}
+
+const diagnosticTextKeys: Record<string, { title: TranslationKey; message: TranslationKey; action?: TranslationKey }> = {
+  config_readable: {
+    title: "settings.diagnostic.configReadable.title",
+    message: "settings.diagnostic.configReadable.message",
+  },
+  config_writable: {
+    title: "settings.diagnostic.configWritable.title",
+    message: "settings.diagnostic.configWritable.message",
+  },
+  config_unreadable: {
+    title: "settings.diagnostic.configUnreadable.title",
+    message: "settings.diagnostic.configUnreadable.message",
+    action: "settings.diagnostic.actionCheckConfig",
+  },
+  config_dir_unwritable: {
+    title: "settings.diagnostic.configDirUnwritable.title",
+    message: "settings.diagnostic.configDirUnwritable.message",
+    action: "settings.diagnostic.actionCheckPermission",
+  },
+  config_unwritable: {
+    title: "settings.diagnostic.configUnwritable.title",
+    message: "settings.diagnostic.configUnwritable.message",
+    action: "settings.diagnostic.actionCheckPermission",
+  },
+  tool_path_expand_failed: {
+    title: "settings.diagnostic.toolPathExpandFailed.title",
+    message: "settings.diagnostic.toolPathExpandFailed.message",
+    action: "settings.diagnostic.actionUpdateToolPath",
+  },
+  tool_path_missing: {
+    title: "settings.diagnostic.toolPathMissing.title",
+    message: "settings.diagnostic.toolPathMissing.message",
+    action: "settings.diagnostic.actionCreatePath",
+  },
+  tool_path_not_directory: {
+    title: "settings.diagnostic.toolPathNotDirectory.title",
+    message: "settings.diagnostic.toolPathNotDirectory.message",
+    action: "settings.diagnostic.actionUpdateToolPath",
+  },
+  tool_path_readable: {
+    title: "settings.diagnostic.toolPathReadable.title",
+    message: "settings.diagnostic.toolPathReadable.message",
+  },
+  tool_path_unreadable: {
+    title: "settings.diagnostic.toolPathUnreadable.title",
+    message: "settings.diagnostic.toolPathUnreadable.message",
+    action: "settings.diagnostic.actionCheckPermission",
+  },
+  tool_path_writable: {
+    title: "settings.diagnostic.toolPathWritable.title",
+    message: "settings.diagnostic.toolPathWritable.message",
+  },
+  tool_path_unwritable: {
+    title: "settings.diagnostic.toolPathUnwritable.title",
+    message: "settings.diagnostic.toolPathUnwritable.message",
+    action: "settings.diagnostic.actionCheckPermission",
+  },
+  skill_source_exists: {
+    title: "settings.diagnostic.skillSourceExists.title",
+    message: "settings.diagnostic.skillSourceExists.message",
+  },
+  skill_source_missing: {
+    title: "settings.diagnostic.skillSourceMissing.title",
+    message: "settings.diagnostic.skillSourceMissing.message",
+    action: "settings.diagnostic.actionDeleteRecord",
+  },
+  distribution_linked: {
+    title: "settings.diagnostic.distributionLinked.title",
+    message: "settings.diagnostic.distributionLinked.message",
+  },
+  distribution_pending: {
+    title: "settings.diagnostic.distributionPending.title",
+    message: "settings.diagnostic.distributionPending.message",
+    action: "settings.diagnostic.actionRedistribute",
+  },
+  distribution_broken: {
+    title: "settings.diagnostic.distributionBroken.title",
+    message: "settings.diagnostic.distributionBroken.message",
+    action: "settings.diagnostic.actionRedistribute",
+  },
+};

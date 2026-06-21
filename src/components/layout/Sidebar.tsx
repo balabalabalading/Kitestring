@@ -10,6 +10,9 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { useI18n } from "../../i18n/I18nProvider";
 import { translateError } from "../../i18n/errors";
+import type { DiagnosticReport } from "../../lib/tauri";
+import { getSkillDiagnosticStates, skillDiagnosticRank, type SkillDiagnosticState } from "../../lib/diagnostics";
+import { Tag } from "../ui/Tag";
 
 interface SidebarProps {
   selectedSkill: Skill | null;
@@ -21,9 +24,13 @@ interface SidebarProps {
   controlledImportOpen?: boolean;
   controlledImportTab?: "local" | "github";
   onControlledImportClose?: () => void;
+  diagnosticReport: DiagnosticReport | null;
+  diagnosing: boolean;
+  onRunDiagnostics: () => Promise<DiagnosticReport>;
+  onDiagnosticsChanged: () => Promise<DiagnosticReport>;
 }
 
-export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp, controlledImportOpen, controlledImportTab, onControlledImportClose }: SidebarProps) {
+export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillProp, onSkillsCleared, onSkillsLoaded, selectedProject, onSelectProject: onSelectProjectProp, controlledImportOpen, controlledImportTab, onControlledImportClose, diagnosticReport, diagnosing, onRunDiagnostics, onDiagnosticsChanged }: SidebarProps) {
   const { locale, t } = useI18n();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -116,6 +123,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       const existing = skills.find((s) => s.id === currentConflict.existing_skill_id);
       if (existing) onSelectSkill(existing);
       await loadData();
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       setError(translateError(e, locale));
     }
@@ -129,6 +137,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
       const newSkill = await tauri.forceImportSkill(currentConflict.source_path, currentConflict.github_url);
       setSkills((prev) => [...prev, newSkill]);
       await loadData();
+      void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
     } catch (e) {
       setError(translateError(e, locale));
     }
@@ -191,6 +200,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           setGroupName(t("group.defaultName"));
           setShowGroupDialog(true);
         }
+        void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
       }
     } catch (e) {
       setError(translateError(e, locale));
@@ -277,6 +287,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
         if (conflicts.length > 0) {
           openNextConflict(conflicts);
         }
+        void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
       }
     } catch (e) {
       setError(translateError(e, locale));
@@ -288,10 +299,16 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
   async function handleProjectCreated(_project: Project) {
     setShowCreateProject(false);
     await loadData();
+    void onDiagnosticsChanged().catch((error) => console.error("Diagnostics failed:", error));
   }
 
   // Sort and filter skills
-  const sortedSkills = [...skills].sort((a, b) => a.name.localeCompare(b.name));
+  const skillDiagnosticStates = getSkillDiagnosticStates(diagnosticReport);
+  const sortedSkills = [...skills].sort((a, b) => {
+    const diagnosticOrder = skillDiagnosticRank(skillDiagnosticStates.get(b.id))
+      - skillDiagnosticRank(skillDiagnosticStates.get(a.id));
+    return diagnosticOrder || a.name.localeCompare(b.name);
+  });
   const lowerQuery = query.toLowerCase();
   const filteredSkills = lowerQuery
     ? sortedSkills.filter((s) => s.name.toLowerCase().includes(lowerQuery))
@@ -441,6 +458,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                       selected={selectedSkill?.id === skill.id}
                       onSelect={() => onSelectSkill(skill)}
                       indent
+                      diagnosticState={skillDiagnosticStates.get(skill.id)}
                     />
                   ))}
                 </div>
@@ -453,6 +471,7 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
                 skill={skill}
                 selected={selectedSkill?.id === skill.id}
                 onSelect={() => onSelectSkill(skill)}
+                diagnosticState={skillDiagnosticStates.get(skill.id)}
               />
             ))}
 
@@ -852,6 +871,10 @@ export default function Sidebar({ selectedSkill, onSelectSkill: onSelectSkillPro
           onSkillsCleared?.();
         }}
         onSkillsImported={() => loadData()}
+        diagnosticReport={diagnosticReport}
+        diagnosing={diagnosing}
+        onRunDiagnostics={onRunDiagnostics}
+        onDiagnosticsChanged={onDiagnosticsChanged}
       />
       <CreateProjectDialog
         open={showCreateProject}
@@ -867,11 +890,13 @@ function SkillItem({
   selected,
   onSelect,
   indent = false,
+  diagnosticState,
 }: {
   skill: Skill;
   selected: boolean;
   onSelect: () => void;
   indent?: boolean;
+  diagnosticState?: SkillDiagnosticState;
 }) {
   const { t } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
@@ -881,6 +906,14 @@ function SkillItem({
     if (skill.has_git) return t("sidebar.sourceLocalGithub");
     return t("common.local");
   }
+
+  const diagnosticTag = diagnosticState === "sourceMissing"
+    ? { label: t("sidebar.diagnostic.sourceMissing"), variant: "error" as const }
+    : diagnosticState === "distributionBroken"
+      ? { label: t("sidebar.diagnostic.distributionBroken"), variant: "error" as const }
+      : diagnosticState === "distributionPending"
+        ? { label: t("sidebar.diagnostic.distributionPending"), variant: "warning" as const }
+        : null;
 
   return (
     <button
@@ -901,7 +934,14 @@ function SkillItem({
           : "text-text-secondary hover:bg-bg-elevated/60"
       } ${isDragging ? "animate-[drag-breathe_1.5s_ease-in-out_infinite]" : ""}`}
     >
-      <span className="truncate text-xs">{skill.name}</span>
+      <span className="flex items-center gap-1.5 min-w-0 w-full">
+        <span className="truncate text-xs min-w-0">{skill.name}</span>
+        {diagnosticTag && (
+          <Tag variant={diagnosticTag.variant} size="xs" className="ml-auto">
+            {diagnosticTag.label}
+          </Tag>
+        )}
+      </span>
       <span className="text-[10px] text-text-tertiary leading-tight">{getSourceLabel()}</span>
     </button>
   );

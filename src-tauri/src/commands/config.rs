@@ -1,4 +1,5 @@
 use crate::models::config::AppConfig;
+use crate::services::diagnostics::DiagnosticReport;
 use std::collections::HashMap;
 
 #[tauri::command]
@@ -51,4 +52,9 @@ pub fn update_ignored_paths(ignored_paths: Vec<String>) -> Result<(), String> {
         config.ignored_paths = ignored_paths;
         crate::models::config::save_config(&config)
     })
+}
+
+#[tauri::command]
+pub fn run_diagnostics() -> Result<DiagnosticReport, String> {
+    Ok(crate::services::diagnostics::run_diagnostics())
 }

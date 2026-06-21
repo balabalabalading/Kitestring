@@ -32,7 +32,7 @@ pnpm tauri dev
 
 ### 发布状态
 
-Kitestring 当前处于 `v0.1.0 Early Preview` 阶段。欢迎围绕 MVP 核心流程提交改进：Skill 导入、GitHub 拉取、symlink 分发、项目扫描、工具路径配置、文件预览、分组和双语界面。
+Kitestring 当前处于 `v0.1.1 Early Preview` 阶段。欢迎围绕 MVP 核心流程提交改进：Skill 导入、GitHub 拉取、symlink 分发、项目扫描、工具路径配置、文件预览、分组、诊断和双语界面。
 
 早期版本暂不承诺配置格式稳定。涉及 `~/.kitestring/config.json` 结构、分发语义或工具默认路径的改动，请在 PR 中说明兼容影响和迁移建议。
 
@@ -77,7 +77,7 @@ pnpm tauri dev
 
 ### Release Status
 
-Kitestring is currently in `v0.1.0 Early Preview`. Contributions around the MVP flows are especially welcome: Skill import, GitHub pull, symlink distribution, project scanning, tool path settings, file preview, groups, and bilingual UI.
+Kitestring is currently in `v0.1.1 Early Preview`. Contributions around the MVP flows are especially welcome: Skill import, GitHub pull, symlink distribution, project scanning, tool path settings, file preview, groups, diagnostics, and bilingual UI.
 
 The early config format is not guaranteed to be stable. If your change touches `~/.kitestring/config.json`, distribution semantics, or default tool paths, please describe compatibility impact and migration guidance in the PR.
 

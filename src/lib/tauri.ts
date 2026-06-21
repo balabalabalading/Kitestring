@@ -134,6 +134,36 @@ export async function updateToolPaths(toolPaths: Record<string, ToolPaths>): Pro
   return invoke("update_tool_paths", { toolPaths });
 }
 
+export type DiagnosticLevel = "ok" | "warning" | "error";
+export type DiagnosticCategory = "config" | "toolPath" | "skillSource" | "distribution";
+
+export interface DiagnosticItem {
+  id: string;
+  level: DiagnosticLevel;
+  category: DiagnosticCategory;
+  code: string;
+  path: string | null;
+  tool: string | null;
+  skill_name: string | null;
+  skill_id: string | null;
+  distribution_id: string | null;
+  status: string | null;
+  detail: string | null;
+}
+
+export interface DiagnosticReport {
+  summary: {
+    ok: number;
+    warning: number;
+    error: number;
+  };
+  items: DiagnosticItem[];
+}
+
+export async function runDiagnostics(): Promise<DiagnosticReport> {
+  return invoke("run_diagnostics");
+}
+
 export interface FileNode {
   name: string;
   path: string;

@@ -53,6 +53,7 @@ pub fn run() {
             commands::config::get_home_dir,
             commands::config::update_tool_paths,
             commands::config::update_ignored_paths,
+            commands::config::run_diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,6 @@
 [package]
 name = "kitestring"
-version = "0.1.0"
+version = "0.1.1"
 description = "风筝线 — AI Agent 技能包管理与分发"
 authors = ["balabalabalading"]
 license = "MIT"

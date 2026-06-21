@@ -24,6 +24,21 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: area
+    attributes:
+      label: 功能领域
+      options:
+        - Skill 导入
+        - Skill 分发
+        - 项目管理
+        - Skill Preset
+        - 外部 Skill 平台集成
+        - 设置 / 诊断
+        - 菜单栏 / 系统托盘
+        - 文档
+        - 其他
+
   - type: textarea
     id: alternatives
     attributes:

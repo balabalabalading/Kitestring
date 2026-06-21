@@ -51,8 +51,51 @@ body:
       options:
         - macOS
         - Windows
+        - Linux
     validations:
       required: true
+
+  - type: dropdown
+    id: operation
+    attributes:
+      label: 问题发生在哪类操作中？
+      options:
+        - 启动 / 安装
+        - 本地导入 Skill
+        - GitHub 导入 Skill
+        - 分发 / 取消分发
+        - 拉取更新
+        - 项目扫描 / 重新扫描
+        - 设置 / 工具路径
+        - 其他
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: target_tools
+    attributes:
+      label: 涉及的 AI 工具
+      options:
+        - label: Claude Code
+        - label: Copilot CLI
+        - label: Gemini CLI
+        - label: Codex
+        - label: Agent Folder
+        - label: 不确定 / 无关
+
+  - type: textarea
+    id: error_message
+    attributes:
+      label: 错误信息
+      description: 请粘贴界面或日志中显示的完整错误文本。
+      render: text
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 诊断结果
+      description: 如果可以，请在设置 - 通用中运行诊断，并粘贴结果或附截图。
+      render: text
 
   - type: textarea
     id: additional

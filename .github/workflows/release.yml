@@ -6,7 +6,7 @@ on:
       tag_name:
         description: Git tag to publish assets to
         required: true
-        default: v0.1.0
+        default: v0.1.1
 
 permissions:
   contents: write
@@ -45,7 +45,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag_name }}
-          releaseName: v0.1.0 Early Preview
+          releaseName: "${{ inputs.tag_name }} Early Preview"
           releaseDraft: false
           prerelease: true
           args: --bundles nsis,msi
@@ -94,7 +94,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag_name }}
-          releaseName: v0.1.0 Early Preview
+          releaseName: "${{ inputs.tag_name }} Early Preview"
           releaseDraft: false
           prerelease: true
           args: --bundles deb,rpm,appimage

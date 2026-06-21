@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 
-export type TagVariant = "default" | "sky" | "earth";
+export type TagVariant = "default" | "sky" | "earth" | "warning" | "error";
 export type TagSize = "xs" | "sm" | "md";
 
 interface TagProps {
@@ -16,12 +16,16 @@ const variantClasses: Record<TagVariant, string> = {
     "bg-bg-surface border-border-subtle text-text-tertiary",
   sky: "bg-accent-sky/10 border-accent-sky/20 text-accent-sky",
   earth: "bg-accent-earth/12 border-accent-earth/25 text-accent-earth",
+  warning: "bg-status-pending/10 border-status-pending/25 text-status-pending",
+  error: "bg-status-broken/10 border-status-broken/25 text-status-broken",
 };
 
 const dotClasses: Record<TagVariant, string> = {
   default: "bg-text-tertiary/40",
   sky: "bg-accent-sky",
   earth: "bg-accent-earth",
+  warning: "bg-status-pending",
+  error: "bg-status-broken",
 };
 
 const sizeClasses: Record<TagSize, string> = {

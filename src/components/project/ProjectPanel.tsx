@@ -121,6 +121,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     try {
       await tauri.distributeToDir(skillId, tool, toolPath);
       await reload();
+      onSkillsUpdated?.();
     } catch (e) {
       setDistError(translateError(e, locale));
     }
@@ -131,6 +132,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
     try {
       await tauri.removeDistribution(distId);
       await reload();
+      onSkillsUpdated?.();
     } catch (e) {
       setDistError(translateError(e, locale));
     }
@@ -147,6 +149,7 @@ export default function ProjectPanel({ project, onProjectDeleted, onSelectSkill,
         await tauri.distributeToDir(addSelectedSkillId, tool, toolPath);
       }
       await reload();
+      onSkillsUpdated?.();
       setShowAddSkill(false);
       setAddSelectedSkillId(null);
       setAddSearch("");

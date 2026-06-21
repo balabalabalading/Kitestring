@@ -28,6 +28,11 @@ const ERROR_RULES: ErrorRule[] = [
     en: "No SKILL.md was found in the cloned repository.",
   },
   {
+    match: "SKILL.md not found at the given source path",
+    zh: "指定来源路径中未找到 SKILL.md",
+    en: "No SKILL.md was found at the given source path.",
+  },
+  {
     match: /^Path does not exist or is not a directory: (.+)$/,
     zh: "路径不存在或不是文件夹: {path}",
     en: "The path does not exist or is not a directory: {path}",
@@ -53,6 +58,11 @@ const ERROR_RULES: ErrorRule[] = [
     en: "Project-scope distribution requires a project ID.",
   },
   {
+    match: /^Failed to inspect worktree status: (.+)$/,
+    zh: "检查 Git 工作区状态失败: {message}",
+    en: "Failed to inspect the Git working tree status: {message}",
+  },
+  {
     match: /worktree|untracked|dirty|commit or clean/i,
     zh: "Git 工作区存在未提交或未跟踪改动，请先提交或清理后再拉取。",
     en: "The Git working tree has uncommitted or untracked changes. Commit or clean them before pulling.",
@@ -66,6 +76,11 @@ const ERROR_RULES: ErrorRule[] = [
     match: /^Failed to parse config: (.+)$/,
     zh: "解析配置失败: {message}",
     en: "Failed to parse config: {message}",
+  },
+  {
+    match: /^Failed to create config dir: (.+)$/,
+    zh: "创建配置目录失败: {message}",
+    en: "Failed to create the config directory: {message}",
   },
   {
     match: /^Failed to write config temp file: (.+)$/,
@@ -83,9 +98,44 @@ const ERROR_RULES: ErrorRule[] = [
     en: "Failed to create symlink: {message}",
   },
   {
+    match: /^Failed to create symlink\. Ensure Developer Mode is enabled or run as administrator: (.+)$/,
+    zh: "创建 symlink 失败。Windows 上请开启 Developer Mode，或使用管理员权限运行: {message}",
+    en: "Failed to create symlink. On Windows, enable Developer Mode or run as administrator: {message}",
+  },
+  {
+    match: /^Failed to remove existing symlink: (.+)$/,
+    zh: "移除旧 symlink 失败: {message}",
+    en: "Failed to remove the existing symlink: {message}",
+  },
+  {
+    match: /^Failed to remove symlink: (.+)$/,
+    zh: "移除 symlink 失败: {message}",
+    en: "Failed to remove symlink: {message}",
+  },
+  {
     match: /^Failed to create directory (.+): (.+)$/,
     zh: "创建目录失败: {path}: {message}",
     en: "Failed to create directory {path}: {message}",
+  },
+  {
+    match: /^Failed to create repos directory: (.+)$/,
+    zh: "创建 GitHub 仓库存放目录失败: {message}",
+    en: "Failed to create the GitHub repos directory: {message}",
+  },
+  {
+    match: /^Failed to clone repository: (.+)$/,
+    zh: "克隆 GitHub 仓库失败: {message}",
+    en: "Failed to clone the GitHub repository: {message}",
+  },
+  {
+    match: /^Failed to fetch: (.+)$/,
+    zh: "拉取远端更新失败: {message}",
+    en: "Failed to fetch remote updates: {message}",
+  },
+  {
+    match: /^Failed to find remote '(.+)': (.+)$/,
+    zh: "未找到 Git 远端「{path}」: {message}",
+    en: "Git remote \"{path}\" was not found: {message}",
   },
 ];
 

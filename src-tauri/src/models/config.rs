@@ -111,7 +111,7 @@ pub fn set_config_dir_for_test(dir: PathBuf) {
     });
 }
 
-fn config_dir() -> PathBuf {
+pub(crate) fn config_dir() -> PathBuf {
     if let Some(override_dir) = CONFIG_DIR_OVERRIDE.with(|cell| cell.borrow().clone()) {
         return override_dir;
     }
@@ -119,7 +119,7 @@ fn config_dir() -> PathBuf {
     home.join(".kitestring")
 }
 
-fn config_file_path() -> PathBuf {
+pub(crate) fn config_file_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
