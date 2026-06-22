@@ -57,6 +57,24 @@ Kitestring 只执行安全的 fast-forward 更新。
 
 请先提交或清理本地改动，再重新拉取。
 
+## 应用更新失败
+
+从 v0.1.2 起，可在 **设置 → 关于** 中点击 **检查更新**。应用启动后也会静默检查一次；无更新或静默检查失败时不会弹窗打断操作。
+
+如果手动检查或安装失败：
+
+- 确认可以访问 `github.com` 和 GitHub Releases；
+- 确认系统时间正确，避免 HTTPS 或更新签名校验异常；
+- 重新打开 **设置 → 关于** 再次检查；
+- 仍然失败时，从 [GitHub Releases](https://github.com/balabalabalading/Kitestring/releases) 手动下载安装对应平台版本。
+
+平台限制：
+
+- v0.1.1 不包含 updater，必须手动安装 v0.1.2；
+- Linux AppImage 支持应用内安装；
+- Linux DEB/RPM 检测到更新后只打开 Releases，不会用 AppImage 覆盖包管理器安装；
+- 更新包签名校验失败时应用会拒绝安装，不应绕过校验。
+
 ## 未找到 `SKILL.md`
 
 Kitestring 只导入包含 `SKILL.md` 的目录。若导入失败：

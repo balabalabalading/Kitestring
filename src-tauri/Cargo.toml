@@ -1,6 +1,6 @@
 [package]
 name = "kitestring"
-version = "0.1.1"
+version = "0.1.2"
 description = "风筝线 — AI Agent 技能包管理与分发"
 authors = ["balabalabalading"]
 license = "MIT"
@@ -23,6 +23,8 @@ tauri = { version = "2.11.1", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"

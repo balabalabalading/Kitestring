@@ -2,11 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: Git tag to publish assets to
-        required: true
-        default: v0.1.1
 
 permissions:
   contents: write
@@ -15,6 +10,8 @@ jobs:
   windows:
     name: Windows 安装包
     runs-on: windows-latest
+    outputs:
+      tag_name: ${{ steps.release_meta.outputs.tag_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,19 +36,39 @@ jobs:
       - name: 安装前端依赖
         run: pnpm install --frozen-lockfile
 
+      - name: 生成发布版本
+        id: release_meta
+        shell: bash
+        run: echo "tag_name=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: 生成发布日志
+        id: release_notes
+        shell: bash
+        run: |
+          body="$(node .github/release/render-notes.mjs --format release --version "${{ steps.release_meta.outputs.tag_name }}")"
+          delimiter="release-notes-$RANDOM-$RANDOM"
+          echo "body<<$delimiter" >> "$GITHUB_OUTPUT"
+          echo "$body" >> "$GITHUB_OUTPUT"
+          echo "$delimiter" >> "$GITHUB_OUTPUT"
+
       - name: 构建并上传 Windows 安装包
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ inputs.tag_name }}
-          releaseName: "${{ inputs.tag_name }} Early Preview"
+          tagName: ${{ steps.release_meta.outputs.tag_name }}
+          releaseName: "${{ steps.release_meta.outputs.tag_name }} Early Preview"
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
-          prerelease: true
+          prerelease: false
+          updaterJsonPreferNsis: true
           args: --bundles nsis,msi
 
   linux:
     name: Linux 安装包
+    needs: windows
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -88,13 +105,26 @@ jobs:
       - name: 安装前端依赖
         run: pnpm install --frozen-lockfile
 
+      - name: 生成发布日志
+        id: release_notes
+        shell: bash
+        run: |
+          body="$(node .github/release/render-notes.mjs --format release --version "${{ needs.windows.outputs.tag_name }}")"
+          delimiter="release-notes-$RANDOM-$RANDOM"
+          echo "body<<$delimiter" >> "$GITHUB_OUTPUT"
+          echo "$body" >> "$GITHUB_OUTPUT"
+          echo "$delimiter" >> "$GITHUB_OUTPUT"
+
       - name: 构建并上传 Linux 安装包
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ inputs.tag_name }}
-          releaseName: "${{ inputs.tag_name }} Early Preview"
+          tagName: ${{ needs.windows.outputs.tag_name }}
+          releaseName: "${{ needs.windows.outputs.tag_name }} Early Preview"
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
-          prerelease: true
+          prerelease: false
           args: --bundles deb,rpm,appimage

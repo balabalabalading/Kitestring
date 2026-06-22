@@ -11,6 +11,7 @@ import { I18nProvider, useI18n } from "./i18n/I18nProvider";
 import { translateError } from "./i18n/errors";
 import type { DiagnosticReport } from "./lib/tauri";
 import { getCriticalDiagnostics } from "./lib/diagnostics";
+import { UpdateProvider } from "./contexts/UpdateContext";
 
 function AppInner() {
   useTheme();
@@ -191,7 +192,9 @@ function App() {
   return (
     <I18nProvider>
       <ToastProvider>
-        <AppInner />
+        <UpdateProvider>
+          <AppInner />
+        </UpdateProvider>
       </ToastProvider>
     </I18nProvider>
   );

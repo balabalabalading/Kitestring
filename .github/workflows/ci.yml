@@ -7,6 +7,38 @@ on:
     branches: [main]
 
 jobs:
+  release-metadata:
+    name: 发布日志校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验结构化发布日志
+        run: |
+          node .github/release/render-notes.mjs --format validate
+          node .github/release/render-notes.mjs --format check-changelog
+
+  frontend-build:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: 安装依赖并构建
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
   rust-tests:
     name: Rust 单元测试
     runs-on: ubuntu-latest

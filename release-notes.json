@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "version": "0.1.2",
+      "date": "2026-06-22",
+      "title": {
+        "zh-CN": "应用内更新与统一发布日志",
+        "en-US": "In-app updates and unified release notes"
+      },
+      "summary": {
+        "zh-CN": "引入应用内更新基础设施，并将 GitHub Release、更新清单与客户端版本新内容统一到同一份双语数据源。",
+        "en-US": "Introduces the in-app update foundation and unifies GitHub Releases, updater metadata, and in-app What's New content under one bilingual source."
+      },
+      "sections": [
+        {
+          "type": "added",
+          "items": {
+            "zh-CN": [
+              "设置页「关于」新增手动检查更新入口和更新状态。",
+              "启动后静默检查新版本，发现更新时提供非阻塞提示。",
+              "安装更新并重启后首次展示当前版本的新内容。"
+            ],
+            "en-US": [
+              "Added manual update checks and update status to Settings > About.",
+              "Added a silent startup update check with a non-blocking availability notice.",
+              "Added a one-time What's New dialog after an update is installed and relaunched."
+            ]
+          }
+        },
+        {
+          "type": "changed",
+          "items": {
+            "zh-CN": [
+              "GitHub Release 正文、CHANGELOG 和 updater notes 改为由结构化双语发布日志统一生成。",
+              "后续 Early Preview 版本使用普通 Release 通道，保证 latest.json 地址稳定可用。"
+            ],
+            "en-US": [
+              "GitHub Release bodies, CHANGELOG, and updater notes now come from one structured bilingual source.",
+              "Future Early Preview builds use the regular Release channel so the latest.json endpoint remains stable."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "version": "0.1.1",
+      "date": "2026-06-21",
+      "title": {
+        "zh-CN": "稳定性与诊断",
+        "en-US": "Stability and diagnostics"
+      },
+      "summary": {
+        "zh-CN": "首个稳定性与诊断维护版本，继续定位为 Early Preview。",
+        "en-US": "The first stability and diagnostics maintenance release, still designated as Early Preview."
+      },
+      "sections": [
+        {
+          "type": "added",
+          "items": {
+            "zh-CN": [
+              "在设置页「通用」中新增环境诊断，检查配置文件、工具路径、Skill 来源和分发状态。",
+              "在 Skill 侧边栏和详情页展示来源缺失、分发断开与目标缺失状态，并支持定位异常工具。",
+              "新增持久错误 Toast，对配置和工具路径的严重问题提供全局提示。",
+              "新增排障指南，并完善 Bug、功能建议与 Discussions 的 GitHub Issue 入口。"
+            ],
+            "en-US": [
+              "Added environment diagnostics for config, tool paths, Skill sources, and distribution status.",
+              "Added source and distribution issue indicators with navigation to affected tools.",
+              "Added persistent global notices for critical config and tool-path failures.",
+              "Added troubleshooting documentation and improved GitHub issue entry points."
+            ]
+          }
+        },
+        {
+          "type": "changed",
+          "items": {
+            "zh-CN": [
+              "补充导入、分发、配置和 Git 操作的中英文错误提示。",
+              "工具路径、Skill 和 Distribution 发生变化后自动刷新诊断结果。",
+              "配置可写诊断与实际的临时文件替换保存机制保持一致。"
+            ],
+            "en-US": [
+              "Expanded bilingual errors for import, distribution, config, and Git operations.",
+              "Diagnostics now refresh after tool path, Skill, and Distribution changes.",
+              "Config writability checks now match the actual atomic replacement save path."
+            ]
+          }
+        },
+        {
+          "type": "fixed",
+          "items": {
+            "zh-CN": [
+              "修复项目级分发变化后侧边栏与诊断状态未及时刷新的问题。",
+              "修复 Git 工作区状态检查失败时被误报为存在未提交改动的问题。"
+            ],
+            "en-US": [
+              "Fixed stale sidebar and diagnostics state after project distribution changes.",
+              "Fixed Git worktree inspection failures being reported as uncommitted changes."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "version": "0.1.0",
+      "date": "2026-06-09",
+      "title": {
+        "zh-CN": "首次公开发布",
+        "en-US": "Initial public release"
+      },
+      "summary": {
+        "zh-CN": "Kitestring 首次公开发布，定位为 Early Preview。",
+        "en-US": "The initial public release of Kitestring, designated as Early Preview."
+      },
+      "sections": [
+        {
+          "type": "added",
+          "items": {
+            "zh-CN": [
+              "支持从本地文件夹或 GitHub 仓库导入包含 SKILL.md 的 Skill。",
+              "支持解析 SKILL.md 元数据并通过 symlink 分发到五类 AI 工具。",
+              "支持项目扫描、分发状态、文件预览、分组和中英文界面。"
+            ],
+            "en-US": [
+              "Added Skill imports from local folders and GitHub repositories.",
+              "Added SKILL.md metadata parsing and symlink distribution to five AI tool types.",
+              "Added project scanning, distribution status, file preview, groups, and bilingual UI."
+            ]
+          }
+        },
+        {
+          "type": "known",
+          "items": {
+            "zh-CN": [
+              "Windows 安装包暂未代码签名，Windows 10+ 需要 WebView2。",
+              "Git 拉取仅支持干净工作区下的 fast-forward 更新。",
+              "SKILL.md front matter 使用轻量解析器，不是完整 YAML 解析器。"
+            ],
+            "en-US": [
+              "Windows installers are not code-signed and require WebView2 on Windows 10+.",
+              "Git pull only supports fast-forward updates from a clean working tree.",
+              "SKILL.md front matter uses a lightweight parser rather than a full YAML parser."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

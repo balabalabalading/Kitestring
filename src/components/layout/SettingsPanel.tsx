@@ -10,6 +10,7 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { translateError } from "../../i18n/errors";
 import type { Locale } from "../../i18n/types";
 import type { TranslationKey } from "../../i18n/I18nProvider";
+import { useAppUpdate } from "../../contexts/UpdateContext";
 
 interface SettingsPanelProps {
   open: boolean;
@@ -44,6 +45,7 @@ const NAV_ITEMS: { id: SettingsTab; labelKey: TranslationKey }[] = [
 export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkillsImported, diagnosticReport, diagnosing, onRunDiagnostics, onDiagnosticsChanged }: SettingsPanelProps) {
   const { mode, setMode } = useTheme();
   const { locale, setLocale, t } = useI18n();
+  const appUpdate = useAppUpdate();
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [paths, setPaths] = useState<Record<string, ToolPaths>>({});
   const [ignoredPaths, setIgnoredPaths] = useState<string[]>([]);
@@ -515,10 +517,31 @@ export default function SettingsPanel({ open, onClose, onSkillsCleared, onSkills
           {settingsTab === "about" && (
             <>
               <div className="text-sm font-bold text-text-primary">{t("settings.about")}</div>
-              <div className="flex flex-col items-center gap-2 bg-bg-elevated rounded-lg px-5 pt-6 pb-6">
+              <div className="relative overflow-hidden flex flex-col items-center gap-2 bg-bg-elevated rounded-lg px-5 pt-6 pb-6">
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-[var(--gradient-thread)]" />
                 <div className="text-[22px] font-bold text-text-primary">Kitestring</div>
                 <div className="text-[12px] text-text-secondary">{t("settings.aboutDescription")}</div>
-                <div className="text-[11px] text-text-tertiary">v0.1.1</div>
+                <div className="font-mono text-[11px] text-text-tertiary">v{appUpdate.currentVersion}</div>
+                <div className="mt-2 flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void appUpdate.checkForUpdates(true)}
+                    disabled={appUpdate.phase === "checking" || appUpdate.phase === "downloading" || appUpdate.phase === "installing"}
+                  >
+                    {appUpdate.phase === "checking" ? t("update.checking") : t("update.checkNow")}
+                  </Button>
+                  {appUpdate.hasCurrentReleaseNote && (
+                    <Button variant="ghost" size="sm" onClick={appUpdate.openWhatsNew}>
+                      {t("update.viewWhatsNew")}
+                    </Button>
+                  )}
+                </div>
+                {appUpdate.availableVersion && (
+                  <div className="mt-1 text-[10px] text-accent-sky">
+                    {t("update.availableInline", { version: appUpdate.availableVersion })}
+                  </div>
+                )}
               </div>
               <div className="text-[11px] text-text-tertiary">Copyright 2026 Kitestring</div>
               <div className="text-sm font-bold text-text-primary">{t("settings.contact")}</div>

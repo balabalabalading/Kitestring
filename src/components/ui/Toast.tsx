@@ -2,7 +2,12 @@ import { createContext, useContext, useState, useCallback, useRef, type ReactNod
 import { Button } from "./Button";
 import { useI18n } from "../../i18n/I18nProvider";
 
-type ToastStatus = "success" | "error";
+type ToastStatus = "success" | "error" | "info";
+
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 interface ToastMessage {
   id: number;
@@ -10,12 +15,14 @@ interface ToastMessage {
   msg: string;
   status: ToastStatus;
   persistent: boolean;
+  action: ToastAction | null;
   exiting: boolean;
 }
 
 interface ToastOptions {
   persistent?: boolean;
   dedupeKey?: string;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
@@ -54,7 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const existing = dedupeKey ? prev.find((toast) => toast.dedupeKey === dedupeKey) : null;
       if (existing) {
         return prev.map((toast) => toast.id === existing.id
-          ? { ...toast, msg, status, persistent: options.persistent ?? false, exiting: false }
+          ? { ...toast, msg, status, persistent: options.persistent ?? false, action: options.action ?? null, exiting: false }
           : toast
         );
       }
@@ -64,6 +71,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         msg,
         status,
         persistent: options.persistent ?? false,
+        action: options.action ?? null,
         exiting: false,
       }];
     });
@@ -86,13 +94,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     removeToast(toast.id);
   }, [removeToast]);
 
+  const handleAction = useCallback((toast: ToastMessage) => {
+    toast.action?.onClick();
+    removeToast(toast.id);
+  }, [removeToast]);
+
   return (
     <ToastContext.Provider value={{ showToast, dismissToast }}>
       {children}
       <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => {
           const isError = t.status === "error";
-          const borderColor = isError ? "var(--status-broken)" : "var(--status-linked)";
+          const borderColor = isError
+            ? "var(--status-broken)"
+            : t.status === "info"
+              ? "var(--accent-sky)"
+              : "var(--status-linked)";
           return (
             <div
               key={t.id}
@@ -108,6 +125,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div className="pl-3 pr-3 py-2 text-[13px] text-text-primary leading-5">
                 {t.msg}
               </div>
+              {t.action && (
+                <Button variant="ghost" size="sm" onClick={() => handleAction(t)} className="mr-1 shrink-0">
+                  {t.action.label}
+                </Button>
+              )}
               {t.persistent && (
                 <Button
                   variant="icon"
