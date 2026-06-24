@@ -4,6 +4,8 @@
 
 AI 技能（Skill）管理与分发工具。从本地文件夹或 GitHub 仓库导入 Skill，通过符号链接一键分发到 Claude Code、Copilot CLI、Gemini CLI、Codex 等 AI 工具。
 
+📖 介绍文章：[别再复制 Skills 文件夹了，我做了一个叫 Kitestring 的小工具](https://mp.weixin.qq.com/s/75j2xGlvt_TNOVqzbtul5g)
+
 [![Download v0.1.2](https://img.shields.io/badge/Download-v0.1.2-D4603A?style=for-the-badge&logo=github)](https://github.com/balabalabalading/Kitestring/releases/tag/v0.1.2)
 
 > **v0.1.2 Early Preview**：Kitestring 已达到可用 MVP 状态，但仍处于早期预览阶段。配置格式、交互细节和工具兼容范围可能在后续版本中调整。
@@ -112,6 +114,8 @@ cd src-tauri && cargo test --lib --quiet
 ## English
 
 Kitestring is a desktop app for managing and distributing AI agent skills. Import skills from local folders or GitHub repositories, then distribute them via symlinks to Claude Code, Copilot CLI, Gemini CLI, Codex, and other tools.
+
+📖 Introduction article: [Stop copying your Skills folder — I built a little tool called Kitestring](https://mp.weixin.qq.com/s/75j2xGlvt_TNOVqzbtul5g)
 
 [![Download v0.1.2](https://img.shields.io/badge/Download-v0.1.2-D4603A?style=for-the-badge&logo=github)](https://github.com/balabalabalading/Kitestring/releases/tag/v0.1.2)
 
